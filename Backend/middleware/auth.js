@@ -1,10 +1,9 @@
 import jwt from "jsonwebtoken"
 
-// TODO : add this while verifying the identity of the user with OTP
 export const protect = async (req, res, next) => {
-    const authHeader = req.headres.authorization;
+    const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startWith("Bearer ")) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
         return res.status(401).json({ success: false, message: "Please provide a valid token" })
     }
 
@@ -24,12 +23,12 @@ export const protect = async (req, res, next) => {
 export const protectDoctor = (req, res, next) => {
     const authHeader = req.headers.authorization
 
-    if(req.path === '/api/doctors/login' || req.path === 'api/doctors/create') return next()
+    if (req.path === '/api/doctors/login' || req.path === 'api/doctors/create') return next()
 
     if (!authHeader?.startsWith('Bearer ')) {
         return res.status(401).json({ success: false, message: 'No token provided. ' })
     }
-    
+
 
     const token = authHeader.split(' ')[1]
 
@@ -49,28 +48,28 @@ export const protectDoctor = (req, res, next) => {
         return res.status(401).json({ success: false, message: 'Invalid or expired token.' })
     }
 }
-export const protectAdmin = (req,res,next)=>{
-    try{
-       const authHeader = eq.headers.authorization
+export const protectAdmin = (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization
 
-       if(req.path === '/api/admin/login') return next()
+        if (req.path === '/api/admin/login') return next()
 
-       if(!authHeader.startWith('Bearer ')){
-         return res.status(401).json({ success: false, message: 'No token provided. ' })
-       }
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ success: false, message: 'No token provided. ' })
+        }
 
-       const toekn = authHeader.split(" ")[1]
+        const token = authHeader.split(" ")[1]
 
-       const decoded = jwt.verify(token,process.env.JWT_SECRET)
-       if(decoded.role !=='admin'){
-         return res.status(403).json({ success: false, message: "Access denied . " })
-       }
-       req.admin = decoded;
+        const decoded = jwt.verify(token, process.env.JWT_SECRET)
+        if (decoded.role !== 'admin') {
+            return res.status(403).json({ success: false, message: "Access denied . " })
+        }
+        req.admin = decoded;
 
-       next();
+        next();
 
     }
-    catch(error){
-      return res.status(401).json({ success: false, message: 'Invalid or expired token.' })
+    catch (error) {
+        return res.status(401).json({ success: false, message: 'Invalid or expired token.' })
     }
 }

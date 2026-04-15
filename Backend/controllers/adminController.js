@@ -6,7 +6,6 @@ import Doctor from "../models/Doctor.js"
 
 export const adminlogin = async (req, res) =>{
     try{
-        console.log("reaches the admin page: ")
        const {email, password } = req.body
 
         if (!email || !password) {
@@ -37,8 +36,6 @@ export const adminlogin = async (req, res) =>{
             process.env.JWT_SECRET,
             {expiresIn: '12h'}
         )
-
-        console.log("this part also get executed: ")
 
         return res.status(200).json({
             success: true,

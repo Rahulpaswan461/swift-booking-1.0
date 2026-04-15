@@ -24,7 +24,7 @@ app.get("/health", (req, res) => {
     return res.send("ok")
 })
 
-app.get("/",(req,res)=>{
+app.get("/", (req, res) => {
     return res.send("From the server")
 })
 

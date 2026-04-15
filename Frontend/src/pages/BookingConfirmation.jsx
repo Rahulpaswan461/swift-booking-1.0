@@ -5,7 +5,9 @@ import Logo from '../components/Logo'
 function formatTime(t) {
   if (!t) return ''
   const [h, m] = t.split(':').map(Number)
-  return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`
+  const res = `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+  console.log("result is:  ", res)
+  return res;
 }
 
 function formatDate(d) {
@@ -15,11 +17,11 @@ function formatDate(d) {
 
 export default function BookingConfirmation() {
   const { state } = useLocation()
-  const navigate  = useNavigate()
-  const checkRef  = useRef(null)
+  const navigate = useNavigate()
+  const checkRef = useRef(null)
 
   const appointment = state?.appointment
-  const doctor      = state?.doctor
+  const doctor = state?.doctor
 
   useEffect(() => {
     if (!appointment) navigate('/')
@@ -44,7 +46,7 @@ export default function BookingConfirmation() {
           <div className="flex justify-center mb-6">
             <div className="relative w-20 h-20">
               <svg width="80" height="80" viewBox="0 0 80 80">
-                <circle cx="40" cy="40" r="36" fill="#f0fdf4" stroke="#bbf7d0" strokeWidth="2"/>
+                <circle cx="40" cy="40" r="36" fill="#f0fdf4" stroke="#bbf7d0" strokeWidth="2" />
                 <circle
                   cx="40" cy="40" r="30"
                   fill="none"
@@ -82,22 +84,22 @@ export default function BookingConfirmation() {
                 <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Doctor</span>
                 <span className="text-sm font-semibold text-gray-800">Dr. {doctor?.fullName || appointment?.doctor}</span>
               </div>
-              <div className="h-px bg-gray-100"/>
+              <div className="h-px bg-gray-100" />
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Specialty</span>
                 <span className="text-sm text-gray-700">{doctor?.specialization || '—'}</span>
               </div>
-              <div className="h-px bg-gray-100"/>
+              <div className="h-px bg-gray-100" />
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Date</span>
                 <span className="text-sm text-gray-700">{formatDate(appointment.appointment_date)}</span>
               </div>
-              <div className="h-px bg-gray-100"/>
+              <div className="h-px bg-gray-100" />
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Time</span>
                 <span className="text-sm font-semibold text-brand-700">{formatTime(appointment.appointment_time)}</span>
               </div>
-              <div className="h-px bg-gray-100"/>
+              <div className="h-px bg-gray-100" />
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Status</span>
                 <span className="flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-100 rounded-full px-2.5 py-1">

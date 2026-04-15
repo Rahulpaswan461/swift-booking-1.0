@@ -13,13 +13,13 @@ adminRouter.post("/login", adminlogin)
 adminRouter.post('/doctors/:id/schedule', protectAdmin, setDoctorSchedule)
 
 // Admin or Doctor mark unavailability
-adminRouter.post("/doctors/:id/unavailability", addUnavailability)
+adminRouter.post("/doctors/:id/unavailability", protectAdmin, addUnavailability)
 
-adminRouter.get("/appointments",protectAdmin, getAllAppointments)
+adminRouter.get("/appointments", protectAdmin, getAllAppointments)
 
-adminRouter.get("/stats", getStats)
+adminRouter.get("/stats", protectAdmin, getStats)
 
-adminRouter.patch("/doctors/:id/toggle",toggleDoctor)
+adminRouter.patch("/doctors/:id/toggle", toggleDoctor)
 
 
 

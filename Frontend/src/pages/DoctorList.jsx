@@ -40,7 +40,7 @@ function DoctorCard({ doctor, onBook, animDelay }) {
       </div>
 
       <h3 className="font-display font-semibold text-gray-900 text-lg mb-0.5">
-        Dr. {doctor.fullName}
+        {doctor.fullName}
       </h3>
       <p className="text-brand-600 text-sm font-medium mb-1">{doctor.specialization || 'General Physician'}</p>
       <p className="text-gray-400 text-xs mb-4">{doctor.qualification || 'MBBS'}</p>
@@ -76,7 +76,7 @@ export default function DoctorList() {
 
   const filtered = doctors.filter(d => {
     const matchSearch = d.fullName?.toLowerCase().includes(search.toLowerCase()) ||
-                        d.specialization?.toLowerCase().includes(search.toLowerCase())
+      d.specialization?.toLowerCase().includes(search.toLowerCase())
     const matchFilter = filter === 'All' || d.specialization === filter
     return matchSearch && matchFilter
   })
@@ -109,8 +109,8 @@ export default function DoctorList() {
         <div className="flex flex-col sm:flex-row gap-3 mb-6 animate-fade-up delay-100">
           <div className="relative flex-1">
             <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300" width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
             <input
               type="text"
@@ -140,12 +140,12 @@ export default function DoctorList() {
         {/* Doctor Grid */}
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1,2,3].map(i => (
+            {[1, 2, 3].map(i => (
               <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 animate-pulse">
-                <div className="w-12 h-12 bg-gray-100 rounded-xl mb-4"/>
-                <div className="h-4 bg-gray-100 rounded w-3/4 mb-2"/>
-                <div className="h-3 bg-gray-100 rounded w-1/2 mb-4"/>
-                <div className="h-9 bg-gray-100 rounded-xl"/>
+                <div className="w-12 h-12 bg-gray-100 rounded-xl mb-4" />
+                <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
+                <div className="h-3 bg-gray-100 rounded w-1/2 mb-4" />
+                <div className="h-9 bg-gray-100 rounded-xl" />
               </div>
             ))}
           </div>

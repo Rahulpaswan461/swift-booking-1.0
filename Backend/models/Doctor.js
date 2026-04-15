@@ -1,7 +1,7 @@
 import mongoose from "mongoose"
 
 const doctorSchema = new mongoose.Schema({
-    fullName:{
+    fullName: {
         type: String,
         required: true
     },
@@ -14,7 +14,7 @@ const doctorSchema = new mongoose.Schema({
         required: true,
         select: false
     },
-    qualification:{
+    qualification: {
         type: String,
     },
     specialization: {
@@ -24,41 +24,12 @@ const doctorSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
-    first_login:{
+    first_login: {
         type: Boolean,
         default: true
     }
-    
-},{timestamps: {createdAt: "created_at"}});
 
-// doctorSchema.pre("save", async function(next){
-//     const user = this;
-
-//     if(!user.isModified("password")) return next();
-//     try{
-//        const salt = await bcrypt.getnSalt(10);
-
-//        const hashedPassword = await bcrypt.hash(user.password, salt)
-
-//        user.password = hashedPassword
-
-//        next();
-//     }
-//     catch(error){
-//         return next(error)
-//     }
-
-// })
-
-// doctorSchema.static("matchPasswordAndGenerateToken", async function(email,password){
-//    const user = await this.findOne({email})
-
-//    if(!user) throw new Error("Invalid username or password !!")
-
-//   const isMatch = await bcrypt.compare(password,user.password)
-
-//    return isMatch
-// })
+}, { timestamps: { createdAt: "created_at" } });
 
 const Doctor = mongoose.model("Doctor", doctorSchema)
 

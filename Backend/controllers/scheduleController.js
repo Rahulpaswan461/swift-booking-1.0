@@ -26,7 +26,7 @@ export const setDoctorSchedule = async (req, res) => {
         )
 
 
-        return res.status(200).json({ success: false, data: schedule })
+        return res.status(200).json({ success: true, data: schedule })
 
     }
     catch (error) {
@@ -104,7 +104,7 @@ export const getDoctorSlots = async (req, res) => {
             status: { $in: ['confirmed', 'pending'] }
         }).select('appointment_time');
 
-        console.log("booked appointment: ",bookedAppointments)
+        console.log("booked appointment: ", bookedAppointments)
 
         const bookedTimes = bookedAppointments.map(a => a.appointment_time)
 

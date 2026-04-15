@@ -6,14 +6,14 @@ import StatusBadge from '../../components/StatusBadge'
 function formatTime(t) {
   if (!t) return ''
   const [h, m] = t.split(':').map(Number)
-  return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
 export default function AdminAppointments() {
-  const [data, setData]         = useState(null)
-  const [loading, setLoading]   = useState(true)
-  const [filters, setFilters]   = useState({
-    date:   new Date().toISOString().split('T')[0],
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [filters, setFilters] = useState({
+    date: new Date().toISOString().split('T')[0],
     status: '',
     doctor: '',
   })
@@ -28,7 +28,7 @@ export default function AdminAppointments() {
   const fetchAppointments = () => {
     setLoading(true)
     const params = new URLSearchParams()
-    if (filters.date)   params.append('date',   filters.date)
+    if (filters.date) params.append('date', filters.date)
     if (filters.status) params.append('status', filters.status)
     if (filters.doctor) params.append('doctor', filters.doctor)
 
@@ -57,7 +57,7 @@ export default function AdminAppointments() {
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-500">Date</label>
             <input type="date" value={filters.date}
-              onChange={e => setFilters({...filters, date: e.target.value})}
+              onChange={e => setFilters({ ...filters, date: e.target.value })}
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
             />
           </div>
@@ -65,7 +65,7 @@ export default function AdminAppointments() {
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-500">Status</label>
             <select value={filters.status}
-              onChange={e => setFilters({...filters, status: e.target.value})}
+              onChange={e => setFilters({ ...filters, status: e.target.value })}
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white">
               <option value="">All statuses</option>
               {statusOptions.filter(Boolean).map(s => (
@@ -77,11 +77,11 @@ export default function AdminAppointments() {
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-500">Doctor</label>
             <select value={filters.doctor}
-              onChange={e => setFilters({...filters, doctor: e.target.value})}
+              onChange={e => setFilters({ ...filters, doctor: e.target.value })}
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white">
               <option value="">All doctors</option>
               {doctors.map(d => (
-                <option key={d._id} value={d._id}>Dr. {d.fullName}</option>
+                <option key={d._id} value={d._id}>{d.fullName}</option>
               ))}
             </select>
           </div>
@@ -90,10 +90,10 @@ export default function AdminAppointments() {
           {data && (
             <div className="flex items-end gap-2 ml-auto flex-wrap">
               {[
-                { label: 'Total',     value: data.summary.total,     color: 'bg-gray-100 text-gray-600' },
+                { label: 'Total', value: data.summary.total, color: 'bg-gray-100 text-gray-600' },
                 { label: 'Confirmed', value: data.summary.confirmed, color: 'bg-blue-50 text-blue-700' },
                 { label: 'Completed', value: data.summary.completed, color: 'bg-green-50 text-green-700' },
-                { label: 'No Show',   value: data.summary.no_show,   color: 'bg-amber-50 text-amber-700' },
+                { label: 'No Show', value: data.summary.no_show, color: 'bg-amber-50 text-amber-700' },
                 { label: 'Cancelled', value: data.summary.cancelled, color: 'bg-red-50 text-red-700' },
               ].map(pill => (
                 <span key={pill.label} className={`text-xs font-medium px-2.5 py-1.5 rounded-lg ${pill.color}`}>
@@ -109,8 +109,8 @@ export default function AdminAppointments() {
           {loading ? (
             <div className="flex items-center justify-center py-16 text-gray-400 text-sm gap-2">
               <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3"/>
-                <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
+                <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
               Loading...
             </div>
@@ -142,7 +142,7 @@ export default function AdminAppointments() {
                         <p className="text-xs text-gray-400">{appt.patient.phone}</p>
                       </td>
                       <td className="px-5 py-3.5">
-                        <p className="font-medium text-gray-800">Dr. {appt.doctor.name}</p>
+                        <p className="font-medium text-gray-800">{appt.doctor.name}</p>
                         <p className="text-xs text-gray-400">{appt.doctor.specialization}</p>
                       </td>
                       <td className="px-5 py-3.5">

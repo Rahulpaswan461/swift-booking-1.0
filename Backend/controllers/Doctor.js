@@ -6,42 +6,6 @@ import bcrypt from 'bcrypt'
 import Appointment from "../models/Appointment.js";
 
 
-// export const registerDoctor = async (req, res) => {
-//     try{ 
-//        const {fullName, email, qualification, specialization, is_active} = req.body;
-
-//        if(!fullName || !email || !qualification || !specialization){
-//            return res.status(400).json({ success: false, message: "Please fill all the fields" })
-//        }
-
-//        const isAlreadyRegisterd = await Doctor.findOne({email})
-//        if(isAlreadyRegisterd){
-//            return res.status(409).json({ success: false, message: "Doctor already exists" })
-//        }
-
-//        const tempPassword = generateTempPassword()
-//        const hashedPassword = await bcrypt.hash(tempPassword, 12)
-
-//        const doctor = await Doctor.create({
-//         fullName,
-//         email: email,
-//         qualification: qualification,
-//         specialization: specialization,
-//         is_active: is_active,
-//         password: hashedPassword,
-//         first_login: true
-//        })
-//        if(!doctor){
-//            return res.status(400).json({ success: false, message: "Registeration failed !!" })
-//        }
-
-//        return res.status(201).json({message: "Registered successfully", date: Date.now()})
-//     }
-//     catch(error){
-//         console.error("Error while registering doctor", error)
-//         return res.status(500).json({ success: false, message: "Something went wrong" })
-//     }
-// }
 
 export const createDoctor = async (req, res) => {
     try {
@@ -56,12 +20,12 @@ export const createDoctor = async (req, res) => {
 
         const existing = await Doctor.findOne({ email })
 
-        // if (existing) {
-        //     return res.status(409).json({
-        //         success: false,
-        //         message: 'A doctor with this email already exists. '
-        //     })
-        // }
+        if (existing) {
+            return res.status(409).json({
+                success: false,
+                message: 'A doctor with this email already exists. '
+            })
+        }
 
         const tempPassword = generateTempPassword()
         const hashedPassword = await bcrypt.hash(tempPassword, 12)
@@ -108,6 +72,7 @@ export const doctorLogin = async (req, res) => {
         }
 
         const doctor = await Doctor.findOne({ email }).select('+password')
+        console.log("doctor response for the first login: ", doctor)
 
         if (!doctor) {
             return res.status(401).json({ success: false, messsage: "Invalid email or password " })
@@ -132,7 +97,7 @@ export const doctorLogin = async (req, res) => {
         return res.status(200).json({
             success: true,
             token,
-            first_login: doctor.fist_login,
+            first_login: doctor.first_login,
             doctor: {
                 id: doctor._id,
                 fullName: doctor.fullName,
@@ -152,6 +117,7 @@ export const changePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body
         const doctorId = req.doctor.id    // comes from protectDoctor middleware
+        console.log("requet doctor: ", req.doctor)
 
         // 1. Validate inputs
         if (!currentPassword || !newPassword) {
@@ -181,11 +147,13 @@ export const changePassword = async (req, res) => {
         if (!doctor) {
             return res.status(404).json({ success: false, message: 'Doctor not found.' })
         }
+        console.log("doctor response: ", doctor)
 
-        // 4. Verify current password is correct
+        // // 4. Verify current password is correct
         const isMatch = await bcrypt.compare(currentPassword, doctor.password)
+        console.log("isMatch: ", isMatch)
         if (!isMatch) {
-            return res.status(401).json({
+            return res.status(400).json({
                 success: false,
                 message: 'Current password is incorrect.'
             })
@@ -203,11 +171,12 @@ export const changePassword = async (req, res) => {
         // 6. Hash new password + update
         const hashedPassword = await bcrypt.hash(newPassword, 12)
 
-        await Doctor.findByIdAndUpdate(doctorId, {
+        const updatedDoctor = await Doctor.findByIdAndUpdate(doctorId, {
             password: hashedPassword,
             first_login: false,           // unlock dashboard access
         })
-
+        console.log("updated doctor: ", updatedDoctor)
+        console.log("executed the code: ")
         return res.status(200).json({
             success: true,
             message: 'Password changed successfully. You can now access your dashboard.',

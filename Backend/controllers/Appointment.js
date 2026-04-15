@@ -2,12 +2,13 @@ import Appointment from "../models/Appointment.js";
 import Doctor from "../models/Doctor.js";
 import Patient from "../models/patient.js";
 import { sendBookingConfirmationEmail } from "../services/emailService.js";
+import crypto from 'crypto';
 
 export const bookAppointment = async (req, res) => {
     try {
         const { fullName, email, phone, date_of_birth, appointment_date, appointment_time, doctor_id, notes } = req.body;
 
-        if (!fullName  || !phone || !doctor_id || !appointment_date || !appointment_time) {
+        if (!fullName || !phone || !doctor_id || !appointment_date || !appointment_time) {
             return res.status(400).json({ success: false, messsage: "Please fill all the fields" })
         }
 
@@ -29,13 +30,16 @@ export const bookAppointment = async (req, res) => {
 
         //Creating the appointment
 
+        const cancel_token = crypto.randomBytes(16).toString("hex");
+
         const appointment = await Appointment.create({
             patient_id: patient._id,
             doctor_id: doctor._id,
             appointment_date: appointment_date,
             appointment_time: appointment_time,
             status: 'confirmed',
-            note: notes || ''
+            note: notes || '',
+            cancel_token
         })
 
         if (!appointment) {
@@ -92,7 +96,7 @@ export const getAppointment = async (req, res) => {
 }
 
 export const cancelAppointment = async (req, res) => {
-    try{
+    try {
         const { id: appointment_id } = req.params;
         if (!appointment_id) {
             return res.status(400).json({ success: false, message: "Please provide appointment id" })
@@ -103,8 +107,35 @@ export const cancelAppointment = async (req, res) => {
         }
         return res.status(200).json({ message: "Appointment cancelled successfully" })
     }
-    catch(error){
+    catch (error) {
         console.error("Error while canceling appointment", error)
-        return res.status(500).json({message: "Internal Server Error"})
+        return res.status(500).json({ message: "Internal Server Error" })
+    }
+}
+
+export const cancelAppointmentWithToken = async (req, res) => {
+    try {
+        const { id: appointment_id, token: cancel_token } = req.params;
+        if (!appointment_id || !cancel_token) {
+            return res.status(400).json({ success: false, message: "Invalid cancellation link" })
+        }
+
+        const appointment = await Appointment.findOne({ _id: appointment_id, cancel_token });
+
+        if (!appointment) {
+            return res.status(400).json({ success: false, message: "Invalid or expired cancellation link" })
+        }
+
+        if (appointment.status === 'cancelled') {
+            return res.status(400).json({ success: false, message: "Appointment is already cancelled" })
+        }
+
+        appointment.status = "cancelled";
+        await appointment.save();
+
+        return res.status(200).json({ success: true, message: "Appointment cancelled successfully" })
+    } catch (error) {
+        console.error("Error while canceling appointment with token", error)
+        return res.status(500).json({ success: false, message: "Internal Server Error" })
     }
 }

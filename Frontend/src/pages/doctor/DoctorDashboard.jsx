@@ -1,20 +1,21 @@
 import { useState, useEffect } from 'react'
 import { doctorApi } from '../../api/axios'
+import { useNavigate } from 'react-router-dom'
 import { DoctorSidebar } from '../../components/Sidebar'
 import StatusBadge from '../../components/StatusBadge'
 
 function formatTime(t) {
   if (!t) return ''
   const [h, m] = t.split(':').map(Number)
-  return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
 function StatCard({ label, value, color }) {
   const colors = {
-    blue:   'bg-blue-50 text-blue-700 border-blue-100',
-    green:  'bg-green-50 text-green-700 border-green-100',
-    amber:  'bg-amber-50 text-amber-700 border-amber-100',
-    gray:   'bg-gray-50 text-gray-600 border-gray-100',
+    blue: 'bg-blue-50 text-blue-700 border-blue-100',
+    green: 'bg-green-50 text-green-700 border-green-100',
+    amber: 'bg-amber-50 text-amber-700 border-amber-100',
+    gray: 'bg-gray-50 text-gray-600 border-gray-100',
   }
   return (
     <div className={`rounded-xl border p-4 ${colors[color]}`}>
@@ -25,12 +26,19 @@ function StatCard({ label, value, color }) {
 }
 
 export default function DoctorDashboard() {
-  const [data, setData]         = useState(null)
-  const [loading, setLoading]   = useState(true)
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [updating, setUpdating] = useState(null)
+  const navigate = useNavigate()
 
   const doctor = JSON.parse(localStorage.getItem('doctor') || '{}')
+
+  useEffect(() => {
+    if (doctor.first_login) {
+      navigate('/doctor/change-password', { replace: true })
+    }
+  }, [doctor.first_login, navigate])
 
   const fetchAppointments = async (date) => {
     setLoading(true)
@@ -49,7 +57,7 @@ export default function DoctorDashboard() {
   const handleStatusUpdate = async (appointmentId, status) => {
     setUpdating(appointmentId)
     try {
-      await doctorApi.patch(`/doctor/appointments/${appointmentId}/status`, { status })
+      await doctorApi.patch(`/doctors/appointments/${appointmentId}/status`, { status })
       fetchAppointments(selectedDate)
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to update status.')
@@ -75,7 +83,7 @@ export default function DoctorDashboard() {
         {/* Header */}
         <div className="mb-7">
           <h1 className="text-2xl font-display font-semibold text-gray-900">
-            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, Dr. {doctor.fullName?.split(' ')[0]} 👋
+            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'},{doctor.fullName?.split(' ')[0]} 👋
           </h1>
           <p className="text-gray-500 text-sm mt-0.5">
             {isToday ? "Here's your schedule for today" : `Appointments for ${new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`}
@@ -85,7 +93,7 @@ export default function DoctorDashboard() {
         {/* Date Selector */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
           {days.map(day => {
-            const d        = new Date(day)
+            const d = new Date(day)
             const isActive = selectedDate === day
             const todayStr = new Date().toISOString().split('T')[0]
             return (
@@ -103,10 +111,10 @@ export default function DoctorDashboard() {
         {/* Stats */}
         {data && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            <StatCard label="Total"     value={data.summary.total}     color="blue"  />
-            <StatCard label="Pending"   value={data.summary.pending}   color="gray"  />
+            <StatCard label="Total" value={data.summary.total} color="blue" />
+            <StatCard label="Pending" value={data.summary.pending} color="gray" />
             <StatCard label="Completed" value={data.summary.completed} color="green" />
-            <StatCard label="No Show"   value={data.summary.no_show}   color="amber" />
+            <StatCard label="No Show" value={data.summary.no_show} color="amber" />
           </div>
         )}
 
@@ -120,8 +128,8 @@ export default function DoctorDashboard() {
           {loading ? (
             <div className="flex items-center justify-center py-16 text-gray-400 text-sm gap-2">
               <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3"/>
-                <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
+                <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
               Loading appointments...
             </div>
@@ -144,7 +152,7 @@ export default function DoctorDashboard() {
                   </div>
 
                   {/* Divider */}
-                  <div className="w-px h-10 bg-gray-200 flex-shrink-0"/>
+                  <div className="w-px h-10 bg-gray-200 flex-shrink-0" />
 
                   {/* Patient info */}
                   <div className="flex-1 min-w-0">

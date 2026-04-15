@@ -27,6 +27,9 @@ const appointmentSchema = new mongoose.Schema({
     notes:{
         type: String,
         default:""
+    },
+    cancel_token: {
+        type: String
     }
 },{timestamps: {createdAt: "created_at", updatedAt: "updated_at"}});
 

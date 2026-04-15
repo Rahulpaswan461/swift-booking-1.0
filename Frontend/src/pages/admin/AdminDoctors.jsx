@@ -3,13 +3,13 @@ import { adminApi } from '../../api/axios'
 import { AdminSidebar } from '../../components/Sidebar'
 
 export default function AdminDoctors() {
-  const [doctors, setDoctors]   = useState([])
-  const [loading, setLoading]   = useState(true)
+  const [doctors, setDoctors] = useState([])
+  const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm]         = useState({ fullName: '', email: '', specialization: '', qualification: '', password: '' })
+  const [form, setForm] = useState({ fullName: '', email: '', specialization: '', qualification: '', password: '' })
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError]       = useState('')
-  const [success, setSuccess]   = useState('')
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [scheduleDoctor, setScheduleDoctor] = useState(null)
@@ -32,7 +32,7 @@ export default function AdminDoctors() {
     setSubmitting(true)
     try {
       await adminApi.post('/doctors/create', form)
-      setSuccess(`Dr. ${form.fullName} added. Credentials sent to ${form.email}.`)
+      setSuccess(`${form.fullName} added. Credentials sent to ${form.email}.`)
       setForm({ fullName: '', email: '', specialization: '', qualification: '', password: '' })
       setShowModal(false)
       fetchDoctors()
@@ -66,7 +66,7 @@ export default function AdminDoctors() {
     setScheduleSubmitting(true)
     try {
       await adminApi.post(`/admin/doctors/${scheduleDoctor._id}/schedule`, scheduleForm)
-      setSuccess(`Schedule updated for Dr. ${scheduleDoctor.fullName}.`)
+      setSuccess(`Schedule updated for ${scheduleDoctor.fullName}.`)
       setShowScheduleModal(false)
       setTimeout(() => setSuccess(''), 4000)
     } catch (err) {
@@ -98,7 +98,7 @@ export default function AdminDoctors() {
           <button onClick={() => setShowModal(true)}
             className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M7 2v10M2 7h10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M7 2v10M2 7h10" stroke="white" strokeWidth="2" strokeLinecap="round" />
             </svg>
             Add doctor
           </button>
@@ -107,8 +107,8 @@ export default function AdminDoctors() {
         {success && (
           <div className="flex items-center gap-2 text-green-700 text-sm bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="7" r="6" stroke="#15803d" strokeWidth="1.5"/>
-              <path d="M4 7l2 2 4-4" stroke="#15803d" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="7" cy="7" r="6" stroke="#15803d" strokeWidth="1.5" />
+              <path d="M4 7l2 2 4-4" stroke="#15803d" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             {success}
           </div>
@@ -117,11 +117,11 @@ export default function AdminDoctors() {
         {/* Doctors grid */}
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1,2,3].map(i => (
+            {[1, 2, 3].map(i => (
               <div key={i} className="bg-white rounded-2xl p-5 border border-gray-100 animate-pulse">
-                <div className="w-10 h-10 bg-gray-100 rounded-xl mb-3"/>
-                <div className="h-4 bg-gray-100 rounded w-3/4 mb-2"/>
-                <div className="h-3 bg-gray-100 rounded w-1/2"/>
+                <div className="w-10 h-10 bg-gray-100 rounded-xl mb-3" />
+                <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
+                <div className="h-3 bg-gray-100 rounded w-1/2" />
               </div>
             ))}
           </div>
@@ -143,12 +143,12 @@ export default function AdminDoctors() {
                   </div>
                   <span className={`text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5
                     ${doctor.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${doctor.is_active ? 'bg-green-500' : 'bg-gray-300'}`}/>
+                    <span className={`w-1.5 h-1.5 rounded-full ${doctor.is_active ? 'bg-green-500' : 'bg-gray-300'}`} />
                     {doctor.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
 
-                <h3 className="font-semibold text-gray-900">Dr. {doctor.fullName}</h3>
+                <h3 className="font-semibold text-gray-900">{doctor.fullName}</h3>
                 <p className="text-brand-600 text-xs font-medium mt-0.5">{doctor.specialization}</p>
                 <p className="text-gray-400 text-xs mt-0.5">{doctor.qualification}</p>
                 <p className="text-gray-400 text-xs mt-0.5">{doctor.email}</p>
@@ -184,25 +184,25 @@ export default function AdminDoctors() {
               <button onClick={() => { setShowModal(false); setError('') }}
                 className="text-gray-400 hover:text-gray-600 transition">
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <path d="M4 4l10 10M14 4L4 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                  <path d="M4 4l10 10M14 4L4 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
               </button>
             </div>
 
             <form onSubmit={handleCreate} className="space-y-3">
               {[
-                { key: 'fullName',       label: 'Full name',       placeholder: 'Anil Mehta',            type: 'text'     },
-                { key: 'email',          label: 'Email',           placeholder: 'doctor@clinic.com',     type: 'email'    },
-                { key: 'specialization', label: 'Specialization',  placeholder: 'Cardiologist',          type: 'text'     },
-                { key: 'qualification',  label: 'Qualification',   placeholder: 'MBBS, MD (optional)',   type: 'text'     },
-                { key: 'password',       label: 'Temp password',   placeholder: 'They will change this', type: 'password' },
+                { key: 'fullName', label: 'Full name', placeholder: 'Anil Mehta', type: 'text' },
+                { key: 'email', label: 'Email', placeholder: 'doctor@clinic.com', type: 'email' },
+                { key: 'specialization', label: 'Specialization', placeholder: 'Cardiologist', type: 'text' },
+                { key: 'qualification', label: 'Qualification', placeholder: 'MBBS, MD (optional)', type: 'text' },
+                { key: 'password', label: 'Temp password', placeholder: 'They will change this', type: 'password' },
               ].map(field => (
                 <div key={field.key}>
                   <label className="block text-xs font-medium text-gray-600 mb-1">{field.label}</label>
                   <input
                     type={field.type}
                     value={form[field.key]}
-                    onChange={e => setForm({...form, [field.key]: e.target.value})}
+                    onChange={e => setForm({ ...form, [field.key]: e.target.value })}
                     placeholder={field.placeholder}
                     required={field.key !== 'qualification'}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent"
@@ -224,8 +224,8 @@ export default function AdminDoctors() {
                   {submitting ? (
                     <>
                       <svg className="animate-spin" width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <circle cx="7" cy="7" r="5" stroke="white" strokeWidth="2" strokeOpacity="0.3"/>
-                        <path d="M12 7a5 5 0 00-5-5" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                        <circle cx="7" cy="7" r="5" stroke="white" strokeWidth="2" strokeOpacity="0.3" />
+                        <path d="M12 7a5 5 0 00-5-5" stroke="white" strokeWidth="2" strokeLinecap="round" />
                       </svg>
                       Creating...
                     </>
@@ -243,12 +243,12 @@ export default function AdminDoctors() {
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h2 className="text-lg font-display font-semibold text-gray-900">Set Schedule</h2>
-                <p className="text-gray-500 text-xs">Dr. {scheduleDoctor?.fullName}</p>
+                <p className="text-gray-500 text-xs"> {scheduleDoctor?.fullName}</p>
               </div>
               <button onClick={() => { setShowScheduleModal(false); setError('') }}
                 className="text-gray-400 hover:text-gray-600 transition">
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <path d="M4 4l10 10M14 4L4 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                  <path d="M4 4l10 10M14 4L4 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
               </button>
             </div>
@@ -262,11 +262,10 @@ export default function AdminDoctors() {
                       key={day}
                       type="button"
                       onClick={() => toggleDay(day)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                        scheduleForm.workingDays.includes(day)
-                          ? 'bg-brand-100 text-brand-700 border border-brand-200'
-                          : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
-                      }`}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${scheduleForm.workingDays.includes(day)
+                        ? 'bg-brand-100 text-brand-700 border border-brand-200'
+                        : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
+                        }`}
                     >
                       {day}
                     </button>
@@ -281,7 +280,7 @@ export default function AdminDoctors() {
                     type="time"
                     required
                     value={scheduleForm.startTime}
-                    onChange={e => setScheduleForm({...scheduleForm, startTime: e.target.value})}
+                    onChange={e => setScheduleForm({ ...scheduleForm, startTime: e.target.value })}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent"
                   />
                 </div>
@@ -291,7 +290,7 @@ export default function AdminDoctors() {
                     type="time"
                     required
                     value={scheduleForm.endTime}
-                    onChange={e => setScheduleForm({...scheduleForm, endTime: e.target.value})}
+                    onChange={e => setScheduleForm({ ...scheduleForm, endTime: e.target.value })}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent"
                   />
                 </div>
@@ -305,7 +304,7 @@ export default function AdminDoctors() {
                   min="5"
                   step="5"
                   value={scheduleForm.slotDurationMin}
-                  onChange={e => setScheduleForm({...scheduleForm, slotDurationMin: parseInt(e.target.value, 10)})}
+                  onChange={e => setScheduleForm({ ...scheduleForm, slotDurationMin: parseInt(e.target.value, 10) })}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent"
                 />
               </div>

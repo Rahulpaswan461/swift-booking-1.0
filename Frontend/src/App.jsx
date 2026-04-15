@@ -6,6 +6,7 @@ import OtpVerification     from './pages/OtpVerification'
 import DoctorList          from './pages/DoctorList'
 import BookAppointment     from './pages/BookAppointment'
 import BookingConfirmation from './pages/BookingConfirmation'
+import CancelAppointment   from './pages/CancelAppointment'
 
 // Doctor pages
 import DoctorLogin     from './pages/doctor/DoctorLogin'
@@ -42,11 +43,12 @@ export default function App() {
         <Route path="/doctors"       element={<PatientRoute><DoctorList /></PatientRoute>} />
         <Route path="/book/:doctorId" element={<PatientRoute><BookAppointment /></PatientRoute>} />
         <Route path="/confirmation"  element={<PatientRoute><BookingConfirmation /></PatientRoute>} />
+        <Route path="/cancel/:id/:cancelToken" element={<CancelAppointment />} />
 
         {/* ── Doctor flow ────────────────────────────── */}
-        <Route path="/doctors/login"            element={<DoctorLogin />} />
-        <Route path="/doctors/change-password"  element={<DoctorRoute><ChangePassword /></DoctorRoute>} />
-        <Route path="/doctors/dashboard"        element={<DoctorRoute><DoctorDashboard /></DoctorRoute>} />
+        <Route path="/doctor/login"            element={<DoctorLogin />} />
+        <Route path="/doctor/change-password"  element={<DoctorRoute><ChangePassword /></DoctorRoute>} />
+        <Route path="/doctor/dashboard"        element={<DoctorRoute><DoctorDashboard /></DoctorRoute>} />
 
         {/* ── Admin flow ─────────────────────────────── */}
         <Route path="/admin/login"        element={<AdminLogin />} />

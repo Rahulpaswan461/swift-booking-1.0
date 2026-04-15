@@ -136,8 +136,8 @@ export default function BookAppointment() {
               {days.map(day => {
                 const d = new Date(day)
                 const dayName = d.toLocaleDateString('en-US', { weekday: 'short' })
-                const dayNum  = d.getDate()
-                const month   = d.toLocaleDateString('en-US', { month: 'short' })
+                const dayNum = d.getDate()
+                const month = d.toLocaleDateString('en-US', { month: 'short' })
                 const isSelected = selectedDate === day
                 return (
                   <button
@@ -170,8 +170,8 @@ export default function BookAppointment() {
               {slotsLoading ? (
                 <div className="flex items-center justify-center gap-2 py-8 text-gray-400 text-sm">
                   <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3"/>
-                    <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
+                    <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                   Loading available slots...
                 </div>
@@ -236,7 +236,7 @@ export default function BookAppointment() {
                   <input
                     type="text"
                     value={form.fullName}
-                    onChange={e => setForm({...form, fullName: e.target.value})}
+                    onChange={e => setForm({ ...form, fullName: e.target.value })}
                     placeholder="Riya Sharma"
                     required
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent"
@@ -247,7 +247,7 @@ export default function BookAppointment() {
                   <input
                     type="tel"
                     value={form.phone}
-                    onChange={e => setForm({...form, phone: e.target.value})}
+                    onChange={e => setForm({ ...form, phone: e.target.value })}
                     placeholder="+91-9876543210"
                     required
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent"
@@ -260,7 +260,7 @@ export default function BookAppointment() {
                 <input
                   type="date"
                   value={form.date_of_birth}
-                  onChange={e => setForm({...form, date_of_birth: e.target.value})}
+                  onChange={e => setForm({ ...form, date_of_birth: e.target.value })}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent"
                 />
               </div>
@@ -269,7 +269,7 @@ export default function BookAppointment() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">Reason for visit <span className="text-gray-400 font-normal">(optional)</span></label>
                 <textarea
                   value={form.notes}
-                  onChange={e => setForm({...form, notes: e.target.value})}
+                  onChange={e => setForm({ ...form, notes: e.target.value })}
                   placeholder="Brief description of your symptoms or reason..."
                   rows={3}
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent resize-none"
@@ -295,8 +295,8 @@ export default function BookAppointment() {
           {error && (
             <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-100 rounded-xl px-4 py-3">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <circle cx="7" cy="7" r="6" stroke="#dc2626" strokeWidth="1.5"/>
-                <path d="M7 4v3M7 9.5v.5" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="7" cy="7" r="6" stroke="#dc2626" strokeWidth="1.5" />
+                <path d="M7 4v3M7 9.5v.5" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
               {error}
             </div>
@@ -310,8 +310,8 @@ export default function BookAppointment() {
             {submitting ? (
               <>
                 <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <circle cx="8" cy="8" r="6" stroke="white" strokeWidth="2" strokeOpacity="0.3"/>
-                  <path d="M14 8a6 6 0 00-6-6" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                  <circle cx="8" cy="8" r="6" stroke="white" strokeWidth="2" strokeOpacity="0.3" />
+                  <path d="M14 8a6 6 0 00-6-6" stroke="white" strokeWidth="2" strokeLinecap="round" />
                 </svg>
                 Confirming appointment...
               </>
