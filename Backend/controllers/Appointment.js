@@ -1,6 +1,6 @@
 import Appointment from "../models/Appointment.js";
 import Doctor from "../models/Doctor.js";
-import Patient from "../models/patient.js";
+import Patient from "../models/Patient.js";
 import { sendBookingConfirmationEmail } from "../services/emailService.js";
 import crypto from 'crypto';
 
