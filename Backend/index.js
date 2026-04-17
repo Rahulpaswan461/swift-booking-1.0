@@ -23,10 +23,11 @@ app.use(express.json())
 app.use(cors({
   origin: [
     'http://localhost:5173',
-    'https://swift-booking-1-0.vercel.app/', 
+    'https://swift-booking-1-0.vercel.app'
   ],
-  credentials: true
-}))
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+}));
 
 app.get("/health", (req, res) => {
     return res.send("ok")
