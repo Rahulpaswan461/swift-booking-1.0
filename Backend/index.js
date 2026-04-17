@@ -20,13 +20,24 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json())
 // app.use(protectDoctor)
-app.use(cors({
-  origin: [
+const allowedOrigins = [
     'http://localhost:5173',
     'https://swift-booking-1-0.vercel.app'
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        if (
+            !origin ||
+            allowedOrigins.includes(origin) ||
+            origin.endsWith('.vercel.app') // 🔥 allow all preview deployments
+        ) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
 }));
 
 app.get("/health", (req, res) => {
