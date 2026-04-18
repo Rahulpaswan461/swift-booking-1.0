@@ -23,7 +23,7 @@ export const sendBookingConfirmationEmail = async ({ appointment, patient, docto
       <p>Your appointment has been successfully booked. Here are your details:</p>
       <table style="width:100%; border-collapse: collapse; margin: 16px 0;">
         <tr><td style="padding: 8px; color: #555;">Doctor</td>
-            <td style="padding: 8px;"><strong>Dr. ${doctor.fullName}</strong></td></tr>
+            <td style="padding: 8px;"><strong>${doctor.fullName}</strong></td></tr>
         <tr style="background:#f5f5f5"><td style="padding: 8px; color: #555;">Specialization</td>
             <td style="padding: 8px;">${doctor.specialization}</td></tr>
         <tr><td style="padding: 8px; color: #555;">Date</td>
