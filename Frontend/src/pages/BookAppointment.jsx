@@ -284,7 +284,7 @@ export default function BookAppointment() {
               <p className="text-xs font-medium text-brand-700 mb-2 uppercase tracking-wider">Appointment summary</p>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">Dr. {doctor.fullName}</p>
+                  <p className="text-sm font-semibold text-gray-900">{doctor.fullName}</p>
                   <p className="text-xs text-gray-500">{formatDisplayDate(selectedDate)} at {formatTime(selectedSlot)}</p>
                 </div>
                 <div className="text-2xl">📋</div>

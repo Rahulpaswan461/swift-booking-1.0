@@ -50,7 +50,7 @@ export const sendBookingConfirmationEmail = async ({ appointment, patient, docto
     const res = await transporter.sendMail({
       from: `Booking Appointment <${process.env.EMAIL_USER}>`,
       to: patient.email,
-      subject: `Appointment confirmed — Dr. ${doctor?.fullName} on ${appointment_date}`,
+      subject: `Appointment confirmed — ${doctor?.fullName} on ${appointment_date}`,
       html,
     });
     if (!res) {
