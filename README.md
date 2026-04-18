@@ -1,69 +1,111 @@
-MediBook — Clinic Appointment Booking System
-A full-stack SaaS appointment booking system built for clinics. Patients book appointments via OTP verification, doctors manage their daily schedule, and admins oversee the entire operation from a central dashboard.
-Live Demo: your-frontend.vercel.app
-Backend API: swift-booking-1-0-1.onrender.com
+# 🏥 MediBook — Clinic Appointment Booking System
 
-Features
-Patient
+A full-stack **SaaS appointment booking system** built for clinics.
+Patients can book appointments via OTP verification, doctors manage schedules, and admins control everything from a centralized dashboard.
 
-Email OTP verification — no password required
-Browse doctors by specialization
-View real-time available slots per doctor
-Book appointments with confirmation email
-Cancel appointments via secure link in email
-24-hour reminder email before appointment
+---
 
-Doctor
+## 🌐 Live Links
 
-Secure login with forced password change on first login
-Daily appointment dashboard with date navigation
-Mark appointments as completed or no-show
-Summary stats — total, pending, completed, no-show per day
+* **Frontend:** https://your-frontend.vercel.app
+* **Backend API:** https://swift-booking-1-0-1.onrender.com
 
-Admin
+---
 
-Overview dashboard with today, this week, and all-time stats
-Per-doctor appointment breakdown
-Full appointments table with filters by date, doctor, status
-Add new doctors — credentials sent via email automatically
-Set weekly schedule per doctor (working days, hours, slot duration)
-Block unavailability — full day or specific time range
-Activate / deactivate doctor accounts
+## ✨ Features
 
+### 👤 Patient
 
-Tech Stack
-Frontend
+* Email OTP verification (no password required)
+* Browse doctors by specialization
+* View real-time available slots
+* Book appointments with confirmation email
+* Cancel appointments via secure email link
+* 24-hour reminder email before appointment
 
-React 18 + Vite
-Tailwind CSS
-React Router v6
-Axios
+---
 
-Backend
+### 🩺 Doctor
 
-Node.js + Express
-MongoDB + Mongoose
-JWT Authentication
-Nodemailer (Gmail SMTP)
-node-cron (reminder job)
-bcrypt
+* Secure login with forced password change on first login
+* Daily appointment dashboard with date navigation
+* Mark appointments as:
 
-Infrastructure
+  * Completed
+  * No-show
+* Daily summary stats:
 
-Frontend → Vercel
-Backend → Render
-Database → MongoDB Atlas
+  * Total
+  * Pending
+  * Completed
+  * No-show
 
+---
 
-Project Structure
+### 🛠️ Admin
+
+* Dashboard with:
+
+  * Today’s stats
+  * Weekly stats
+  * All-time stats
+* Per-doctor appointment breakdown
+* Full appointment table with filters:
+
+  * Date
+  * Doctor
+  * Status
+* Add new doctors (credentials sent via email)
+* Configure weekly schedules:
+
+  * Working days
+  * Working hours
+  * Slot duration
+* Block unavailability:
+
+  * Full day
+  * Custom time range
+* Activate / deactivate doctor accounts
+
+---
+
+## 🧱 Tech Stack
+
+### Frontend
+
+* React 18 + Vite
+* Tailwind CSS
+* React Router v6
+* Axios
+
+### Backend
+
+* Node.js + Express
+* MongoDB + Mongoose
+* JWT Authentication
+* Nodemailer (Gmail SMTP)
+* node-cron (reminder jobs)
+* bcrypt
+
+### Infrastructure
+
+* Frontend → Vercel
+* Backend → Render
+* Database → MongoDB Atlas
+
+---
+
+## 📁 Project Structure
+
+```bash
 medibook/
 ├── frontend/
 │   ├── src/
 │   │   ├── api/
-│   │   │   └── axios.js               # Axios instances (patient, doctor, admin)
+│   │   │   └── axios.js
 │   │   ├── components/
 │   │   │   ├── Logo.jsx
-│   │   │   ├── Sidebar.jsx            # Doctor + Admin sidebars
+│   │   │   ├── Sidebar.jsx
 │   │   │   ├── StatusBadge.jsx
 │   │   │   └── StepIndicator.jsx
 │   │   ├── pages/
@@ -97,9 +139,9 @@ medibook/
     │   │   ├── scheduleController.js
     │   │   └── adminController.js
     │   ├── middleware/
-    │   │   ├── auth.js                # Patient JWT
-    │   │   ├── doctorAuth.js          # Doctor JWT
-    │   │   └── adminAuth.js           # Admin JWT
+    │   │   ├── auth.js
+    │   │   ├── doctorAuth.js
+    │   │   └── adminAuth.js
     │   ├── models/
     │   │   ├── Patient.js
     │   │   ├── Doctor.js
@@ -126,3 +168,74 @@ medibook/
     │   │   └── slotUtils.js
     │   └── index.js
     └── package.json
+```
+
+---
+
+## 🚀 Getting Started
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/your-username/medibook.git
+cd medibook
+```
+
+### 2. Setup Backend
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+### 3. Setup Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+## 🔐 Environment Variables
+
+### Backend (`.env`)
+
+```env
+PORT=5000
+MONGO_URI=your_mongodb_connection
+JWT_SECRET=your_secret
+EMAIL_USER=your_email
+EMAIL_PASS=your_email_password
+FRONTEND_URL=http://localhost:5173
+```
+
+---
+
+## 📌 Future Improvements
+
+* Payment integration
+* SMS notifications
+* Multi-clinic support
+* Doctor ratings & reviews
+* Mobile app (React Native)
+
+---
+
+## 🤝 Contributing
+
+Pull requests are welcome. For major changes, open an issue first to discuss.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+---
+
+## 💡 Author
+
+Built with ❤️ by Rahul
