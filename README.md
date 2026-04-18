@@ -186,7 +186,7 @@ cd medibook
 ```bash
 cd backend
 npm install
-npm run dev
+npm start
 ```
 
 ### 3. Setup Frontend
