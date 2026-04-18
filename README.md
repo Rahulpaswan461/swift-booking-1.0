@@ -239,3 +239,17 @@ This project is licensed under the MIT License.
 ## 💡 Author
 
 Built with ❤️ by Rahul
+
+
+
+## 📱 Try MediBook
+
+Scan the QR code below to open the app:
+
+<p align="center">
+  <img src="./assets/medibook-qr.png" width="200" />
+</p>
+
+<p align="center">
+  <a href="https://your-frontend.vercel.app">Or click here to open</a>
+</p>
