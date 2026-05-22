@@ -1,6 +1,5 @@
+import "dotenv/config"
 import express from "express"
-import "./env.js"
-import connectMongoDb from "./connection.js"
 import AppointmentRouter from "./routes/Appointment.js"
 import DoctorRouter from "./routes/Doctor.js"
 import OtpRouter from "./routes/OtpRouter.js"
@@ -10,11 +9,6 @@ import cors from "cors"
 
 
 const app = express()
-
-//creating the connection
-connectMongoDb(process.env.MONGO_URL)
-    .then(() => console.log("MongoDB connected successfully"))
-    .catch((error) => console.log("Error while connecting mongoDb", error))
 
 const PORT = process.env.PORT || 3000;
 

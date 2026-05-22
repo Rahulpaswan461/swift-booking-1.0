@@ -1,34 +1,35 @@
-import mongoose from 'mongoose'
+import supabase from '../config/supabase.js'
 import bcrypt from 'bcrypt'
 import dotenv from 'dotenv'
-import Admin from '../models/Admin.js'
-
 dotenv.config()
 
 const seedAdmin = async () => {
     try {
-        await mongoose.connect(process.env.MONGO_URL)
-        console.log("MongoDB connected through script !!")
+        const { data: existing } = await supabase
+            .from('admins')
+            .select('id')
+            .eq('email', process.env.ADMIN_EMAIL)
+            .single()
 
-        const existing = await Admin.findOne({ email: process.env.ADMIN_EMAIL })
         if (existing) {
-            console.log("Admin already exists. Skipping. ")
+            console.log('Admin already exists. Skipping.')
             process.exit(0)
         }
 
-        const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD, 12)
+        const password = await bcrypt.hash(process.env.ADMIN_PASSWORD, 12)
 
-        await Admin.create({
-            fullName: process.env.ADMIN_NAME,
+        const { error } = await supabase.from('admins').insert({
+            full_name: process.env.ADMIN_NAME,
             email: process.env.ADMIN_EMAIL,
-            password: hashedPassword
+            password,
         })
 
-        console.log(`Admin created successfully -> ${process.env.ADMIN_EMAIL}`)
+        if (error) throw error
+
+        console.log('Admin created →', process.env.ADMIN_EMAIL)
         process.exit(0)
-    }
-    catch (error) {
-        console.error('Seed failed:', error.message)
+    } catch (err) {
+        console.error('Seed failed:', err.message)
         process.exit(1)
     }
 }

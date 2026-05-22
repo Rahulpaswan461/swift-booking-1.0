@@ -1,10 +1,7 @@
-import Doctor from "../models/Doctor.js";
-import DoctorSchedule from "../models/DoctorSchedule.js";
-import DoctorUnavailability from "../models/DoctorUnavailability.js";
-import { generateSlots, getDayAbb, isSlotBlocked } from "../utils/slotUtils.js";
-import Appointment from '../models/Appointment.js'
+import supabase from "../config/supabase.js"
+import { generateSlots, getDayAbb, isSlotBlocked } from "../utils/slotUtils.js"
 
-//Admin sets or updates a doctor's default weekly schedule
+// Admin sets or updates a doctor's default weekly schedule
 export const setDoctorSchedule = async (req, res) => {
     try {
         const { id: doctor_id } = req.params;
@@ -14,17 +11,35 @@ export const setDoctorSchedule = async (req, res) => {
             return res.status(400).json({ message: "Please provide all the fields" })
         }
 
-        const doctor = await Doctor.findById(doctor_id)
-        if (!doctor) {
+        // Check if doctor exists
+        const { data: doctor, error: doctorError } = await supabase
+            .from('doctors')
+            .select('id')
+            .eq('id', doctor_id)
+            .single()
+
+        if (doctorError || !doctor) {
             return res.status(400).json({ message: "Doctor not found" })
         }
-        //insert data if exists otherwise create a new one
-        const schedule = await DoctorSchedule.findOneAndUpdate(
-            { doctorId: doctor_id },
-            { workingDays: workingDays, startTime, endTime, slotDurationMin },
-            { upsert: true, new: true, runValidators: true }
-        )
 
+        // Upsert schedule (insert if new, update if exists)
+        const { data: schedule, error } = await supabase
+            .from('doctor_schedules')
+            .upsert(
+                {
+                    doctor_id,
+                    working_days: workingDays,
+                    start_time: startTime,
+                    end_time: endTime,
+                    slot_duration_min: slotDurationMin,
+                    updated_at: new Date().toISOString()
+                },
+                { onConflict: 'doctor_id' }
+            )
+            .select()
+            .single()
+
+        if (error) throw error
 
         return res.status(200).json({ success: true, data: schedule })
 
@@ -35,90 +50,113 @@ export const setDoctorSchedule = async (req, res) => {
     }
 }
 
-//mark the doctor as unavailable
+// Mark the doctor as unavailable
 export const addUnavailability = async (req, res) => {
     try {
         const { id: doctorId } = req.params;
         const { date, startTime, endTime, reason } = req.body;
 
         if (!date) {
-            return res.status(400).json({ success: false, message: "Date is required: " })
+            return res.status(400).json({ success: false, message: "Date is required" })
         }
 
-        const doctor = await Doctor.findById(doctorId)
-        if (!doctor) {
-            return res.status(404).json({ success: false, message: 'Doctor not found. ' })
+        // Check if doctor exists
+        const { data: doctor, error: doctorError } = await supabase
+            .from('doctors')
+            .select('id')
+            .eq('id', doctorId)
+            .single()
+
+        if (doctorError || !doctor) {
+            return res.status(404).json({ success: false, message: 'Doctor not found.' })
         }
 
-        const unavailability = await DoctorUnavailability.findOneAndUpdate(
-            { doctorId },
-            { startTime, endTime, reason },
-            { upsert: true, new: true, runValidators: true }
-        )
+        const { data: unavailability, error } = await supabase
+            .from('doctor_unavailability')
+            .insert({
+                doctor_id: doctorId,
+                date,
+                start_time: startTime || null,
+                end_time: endTime || null,
+                reason: reason || ''
+            })
+            .select()
+            .single()
 
+        if (error) throw error
 
         return res.status(201).json({ success: true, data: unavailability })
 
     }
     catch (error) {
-        console.log("addUnavailabity error: ", error);
+        console.log("addUnavailability error: ", error);
         return res.status(500).json({ success: false, message: "Internal Server Error !!" })
     }
 }
-//Return available slots for a doctor on a given date
+
+// Return available slots for a doctor on a given date
 export const getDoctorSlots = async (req, res) => {
     try {
         const { id: doctorId } = req.params;
         const { date } = req.query
 
         if (!date) {
-            return res.status(400).json({ success: false, message: "date query params is required " })
+            return res.status(400).json({ success: false, message: "date query params is required" })
         }
 
-        //1 Get doctor's default schedule
+        // 1. Get doctor's default schedule
+        const { data: schedule, error: scheduleError } = await supabase
+            .from('doctor_schedules')
+            .select('*')
+            .eq('doctor_id', doctorId)
+            .single()
 
-        const schedule = await DoctorSchedule.findOne({ doctorId })
-        if (!schedule) {
+        if (scheduleError || !schedule) {
             return res.status(400).json({ success: false, message: 'No schedule set for this doctor.' })
         }
 
         console.log("schedule of the doctor: ", schedule)
-        //2 Check if requested date is working day 
-        const dayAbbr = getDayAbb(date)
-        console.log("Day abbpre: ", dayAbbr)
-        if (!schedule.workingDays.includes(dayAbbr)) {
-            return res.status(200).json({ success: true, availableSlots: [], message: "Doctor is of on this day. " })
 
+        // 2. Check if requested date is working day
+        const dayAbbr = getDayAbb(date)
+        console.log("Day abbr: ", dayAbbr)
+        if (!schedule.working_days.includes(dayAbbr)) {
+            return res.status(200).json({ success: true, availableSlots: [], message: "Doctor is off on this day." })
         }
 
-        const allSlots = generateSlots(schedule.startTime, schedule.endTime, schedule.slotDurationMin);
+        const allSlots = generateSlots(schedule.start_time, schedule.end_time, schedule.slot_duration_min);
 
-        //4. Get unavailabilities for this date
-        const unavailabilities = await DoctorUnavailability.findOne({ doctorId, date })
+        // 4. Get unavailabilities for this date
+        const { data: unavailabilities } = await supabase
+            .from('doctor_unavailability')
+            .select('*')
+            .eq('doctor_id', doctorId)
+            .eq('date', date)
 
+        // 5. Get already booked slots for this date
+        const { data: bookedAppointments, error: appointmentsError } = await supabase
+            .from('appointments')
+            .select('appointment_time')
+            .eq('doctor_id', doctorId)
+            .eq('appointment_date', date)
+            .in('status', ['confirmed', 'pending'])
 
-        // 5 Get already booked slots for this date
-        const bookedAppointments = await Appointment.find({
-            doctor_id: doctorId,
-            appointment_date: date,
-            status: { $in: ['confirmed', 'pending'] }
-        }).select('appointment_time');
+        if (appointmentsError) throw appointmentsError
 
         console.log("booked appointment: ", bookedAppointments)
 
-        const bookedTimes = bookedAppointments.map(a => a.appointment_time)
-
+        const bookedTimes = bookedAppointments?.map(a => a.appointment_time) || []
 
         // 6. Filter out blocked and booked slots
         console.log("all slots: ", allSlots)
-        console.log("bookedTime: ", bookedTimes)
+        console.log("bookedTimes: ", bookedTimes)
         const availableSlots = allSlots.filter(slot => {
             const isBooked = bookedTimes.includes(slot);
-            const isBlocked = isSlotBlocked(slot, unavailabilities)
+            const isBlocked = isSlotBlocked(slot, unavailabilities?.[0])
 
             return !isBooked && !isBlocked;
         })
-        console.log("avialable slots: ", availableSlots)
+        console.log("available slots: ", availableSlots)
 
         return res.status(200).json({
             success: true,

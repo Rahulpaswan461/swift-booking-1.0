@@ -1,11 +1,8 @@
-import Doctor from "../models/Doctor.js";
+import supabase from "../config/supabase.js"
 import jwt from "jsonwebtoken"
-import { sendWelcomeEmail } from "../services/emailService.js";
-import { generateTempPassword } from "../utils/otpUtils.js";
+import { sendWelcomeEmail } from "../services/emailService.js"
+import { generateTempPassword } from "../utils/otpUtils.js"
 import bcrypt from 'bcrypt'
-import Appointment from "../models/Appointment.js";
-
-
 
 export const createDoctor = async (req, res) => {
     try {
@@ -14,43 +11,56 @@ export const createDoctor = async (req, res) => {
         if (!fullName || !email || !specialization) {
             return res.status(400).json({
                 success: false,
-                message: 'Fullname , email and specialization are required .'
+                message: 'Fullname, email and specialization are required.'
             })
         }
 
-        const existing = await Doctor.findOne({ email })
+        // Check if doctor already exists
+        const { data: existing, error: checkError } = await supabase
+            .from('doctors')
+            .select('id')
+            .eq('email', email)
+            .single()
 
         if (existing) {
             return res.status(409).json({
                 success: false,
-                message: 'A doctor with this email already exists. '
+                message: 'A doctor with this email already exists.'
             })
         }
 
         const tempPassword = generateTempPassword()
         const hashedPassword = await bcrypt.hash(tempPassword, 12)
 
+        const { data: doctor, error: createError } = await supabase
+            .from('doctors')
+            .insert({
+                full_name: fullName,
+                email,
+                specialization,
+                qualification,
+                password: hashedPassword,
+                first_login: true,
+                is_active: true
+            })
+            .select('id, full_name, email, specialization, qualification, is_active')
+            .single()
 
-        const doctor = await Doctor.create({
-            fullName,
-            email,
-            specialization,
-            qualification,
-            password: hashedPassword,
-            first_login: true,
-            is_active: true
-        })
+        if (createError || !doctor) {
+            console.error("Error creating doctor:", createError)
+            return res.status(400).json({ success: false, message: 'Failed to create doctor.' })
+        }
 
-        const send = await sendWelcomeEmail({ doctor, tempPassword }).catch(err =>
+        await sendWelcomeEmail({ doctor: { fullName, email }, tempPassword }).catch(err =>
             console.error("Welcome email failed: ", err.message)
         )
 
         return res.status(201).json({
             success: true,
-            message: 'Doctor account created. Credentials are: ',
+            message: 'Doctor account created. Credentials have been sent to email.',
             data: {
-                id: doctor._id,
-                fullName: doctor.fullName,
+                id: doctor.id,
+                fullName: doctor.full_name,
                 email: doctor.email,
                 specialization: doctor.specialization,
                 qualification: doctor.qualification,
@@ -68,21 +78,27 @@ export const doctorLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) {
-            return res.status(400).json({ message: "Email,password is required !!" })
+            return res.status(400).json({ message: "Email, password is required !!" })
         }
 
-        const doctor = await Doctor.findOne({ email }).select('+password')
+        // Fetch doctor with password
+        const { data: doctor, error } = await supabase
+            .from('doctors')
+            .select('*')
+            .eq('email', email)
+            .single()
+
         console.log("doctor response for the first login: ", doctor)
 
-        if (!doctor) {
-            return res.status(401).json({ success: false, messsage: "Invalid email or password " })
+        if (error || !doctor) {
+            return res.status(401).json({ success: false, message: "Invalid email or password" })
         }
 
         if (!doctor.is_active) {
             return res.status(403).json({ success: false, message: "Your account has been deactivated. Contact admin." })
         }
 
-        const isMatch = bcrypt.compare(password, doctor.password)
+        const isMatch = await bcrypt.compare(password, doctor.password)
 
         if (!isMatch) {
             return res.status(401).json({ success: false, message: "Invalid Email or password" })
@@ -99,8 +115,8 @@ export const doctorLogin = async (req, res) => {
             token,
             first_login: doctor.first_login,
             doctor: {
-                id: doctor._id,
-                fullName: doctor.fullName,
+                id: doctor.id,
+                fullName: doctor.full_name,
                 email: doctor.email,
                 specialization: doctor.specialization,
                 qualification: doctor.qualification
@@ -116,8 +132,9 @@ export const doctorLogin = async (req, res) => {
 export const changePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body
-        const doctorId = req.doctor.id    // comes from protectDoctor middleware
-        console.log("requet doctor: ", req.doctor)
+        const doctorId = req.doctor.id
+
+        console.log("request doctor: ", req.doctor)
 
         // 1. Validate inputs
         if (!currentPassword || !newPassword) {
@@ -142,14 +159,20 @@ export const changePassword = async (req, res) => {
             })
         }
 
-        // 3. Fetch doctor with password (select:false means we must explicitly request it)
-        const doctor = await Doctor.findById(doctorId).select('+password')
-        if (!doctor) {
+        // 3. Fetch doctor with password
+        const { data: doctor, error: fetchError } = await supabase
+            .from('doctors')
+            .select('*')
+            .eq('id', doctorId)
+            .single()
+
+        if (fetchError || !doctor) {
             return res.status(404).json({ success: false, message: 'Doctor not found.' })
         }
+
         console.log("doctor response: ", doctor)
 
-        // // 4. Verify current password is correct
+        // 4. Verify current password is correct
         const isMatch = await bcrypt.compare(currentPassword, doctor.password)
         console.log("isMatch: ", isMatch)
         if (!isMatch) {
@@ -171,10 +194,18 @@ export const changePassword = async (req, res) => {
         // 6. Hash new password + update
         const hashedPassword = await bcrypt.hash(newPassword, 12)
 
-        const updatedDoctor = await Doctor.findByIdAndUpdate(doctorId, {
-            password: hashedPassword,
-            first_login: false,           // unlock dashboard access
-        })
+        const { data: updatedDoctor, error: updateError } = await supabase
+            .from('doctors')
+            .update({
+                password: hashedPassword,
+                first_login: false
+            })
+            .eq('id', doctorId)
+            .select()
+            .single()
+
+        if (updateError) throw updateError
+
         console.log("updated doctor: ", updatedDoctor)
         console.log("executed the code: ")
         return res.status(200).json({
@@ -190,14 +221,19 @@ export const changePassword = async (req, res) => {
 
 export const getDoctor = async (req, res) => {
     try {
-
         console.log("route called ")
         const { email } = req.query;
-        const doctor = await Doctor.findOne({ email })
 
-        if (!doctor) {
+        const { data: doctor, error } = await supabase
+            .from('doctors')
+            .select('id, full_name, email, specialization, qualification, is_active')
+            .eq('email', email)
+            .single()
+
+        if (error || !doctor) {
             return res.status(400).json({ success: false, message: "Doctor not found" })
         }
+
         return res.status(200).json({ message: "Doctor found", data: doctor })
 
     } catch (error) {
@@ -208,7 +244,12 @@ export const getDoctor = async (req, res) => {
 
 export const getAllDoctors = async (req, res) => {
     try {
-        const doctors = await Doctor.find()
+        const { data: doctors, error } = await supabase
+            .from('doctors')
+            .select('id, full_name, email, specialization, qualification, is_active, created_at')
+
+        if (error) throw error
+
         return res.status(200).json({ message: "All doctors fetched", data: doctors })
     }
     catch (error) {
@@ -224,22 +265,24 @@ export const getDoctorAppointments = async (req, res) => {
 
         const date = req.query.date || new Date().toISOString().split('T')[0]
 
-        const appointments = await Appointment.find({
-            doctor_id: doctorId,
-            appointment_date: date,
-            status: { $ne: 'cancelled' }
-        }).populate('patient_id', 'fullName email phone')
-            .sort({ appointment_time: 1 })
+        const { data: appointments, error } = await supabase
+            .from('appointments')
+            .select(`
+                *,
+                patients (full_name, email, phone)
+            `)
+            .eq('doctor_id', doctorId)
+            .eq('appointment_date', date)
+            .neq('status', 'cancelled')
+            .order('appointment_time', { ascending: true })
 
-        //summary of the appointment
+        if (error) throw error
 
-        const total = appointments.length;
-
+        // Summary of appointments
+        const total = appointments.length
         const completed = appointments.filter(a => a.status === "completed").length
-        const pending = appointments.filter(a => a.status === "pending").length;
-        const noShow = appointments.filter(a => a.status === "no_show").length;
-
-
+        const pending = appointments.filter(a => a.status === "pending").length
+        const noShow = appointments.filter(a => a.status === "no_show").length
 
         return res.status(200).json({
             success: true,
@@ -250,11 +293,11 @@ export const getDoctorAppointments = async (req, res) => {
                 pending,
                 noShow,
                 data: appointments.map(a => ({
-                    id: a._id,
+                    id: a.id,
                     patient: {
-                        name: a.petient_id?.fullName,
-                        email: a.patient_id?.email,
-                        phone: a.patient_id?.phone,
+                        name: a.patients?.full_name,
+                        email: a.patients?.email,
+                        phone: a.patients?.phone,
                     },
                     appointment_time: a.appointment_time,
                     status: a.status,
@@ -265,8 +308,8 @@ export const getDoctorAppointments = async (req, res) => {
 
     }
     catch (error) {
-        console.error("Error while getting the doctor appointements: ", error.stack)
-        return res.status(500).json({ success: false, message: "Something went wrong " })
+        console.error("Error while getting the doctor appointments: ", error.stack)
+        return res.status(500).json({ success: false, message: "Something went wrong" })
     }
 }
 
@@ -278,18 +321,21 @@ export const updateAppointmentStatus = async (req, res) => {
 
         const allowedStatuses = ['completed', 'no_show']
         if (!allowedStatuses.includes(status)) {
-            return req.status(400).json({
+            return res.status(400).json({
                 success: false,
                 message: 'Status must be either completed or no_show'
             })
         }
 
-        const appointment = await Appointment.findOne({
-            _id: id,
-            doctor_id: doctorId
-        })
+        // Get appointment with ownership check
+        const { data: appointment, error: fetchError } = await supabase
+            .from('appointments')
+            .select('*')
+            .eq('id', id)
+            .eq('doctor_id', doctorId)
+            .single()
 
-        if (!appointment) {
+        if (fetchError || !appointment) {
             return res.status(404).json({
                 success: false,
                 message: 'Appointment not found'
@@ -306,24 +352,34 @@ export const updateAppointmentStatus = async (req, res) => {
         if (appointment.status === 'cancelled') {
             return res.status(400).json({
                 success: false,
-                message: 'Can not update a cancelled appointment. '
+                message: 'Can not update a cancelled appointment.'
             })
         }
 
-        appointment.status = status;
-        await appointment.save();
+        // Update appointment status
+        const { data: updated, error: updateError } = await supabase
+            .from('appointments')
+            .update({
+                status,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .select()
+            .single()
+
+        if (updateError) throw updateError
 
         return res.status(200).json({
             success: true,
             message: `Appointment marked as ${status}.`,
             data: {
-                id: appointment._id,
-                status: appointment.status
+                id: updated.id,
+                status: updated.status
             }
         })
     }
     catch (error) {
         console.error("Error while updating the appointment status: ", error.stack)
-        return res.status(500).json({ success: false, message: "Internal Server Error " })
+        return res.status(500).json({ success: false, message: "Internal Server Error" })
     }
 }
