@@ -11,7 +11,7 @@ const transporter = nodemailer.createTransport({
 export const sendBookingConfirmationEmail = async ({ appointment, patient, doctor }) => {
   console.log("send booking confiration email", process.env.FRONTEND_URL)
 
-  const { _id, appointment_date, appointment_time } = appointment
+  const { id, appointment_date, appointment_time } = appointment
 
   const [h, m] = appointment_time.split(':').map(Number)
   const suffix = `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
@@ -19,11 +19,11 @@ export const sendBookingConfirmationEmail = async ({ appointment, patient, docto
   const html = `
     <div style="font-family: sans-serif; max-width: 520px; margin: auto;">
       <h2 style="color: #1a73e8;">Appointment Confirmed ✓</h2>
-      <p>Hi <strong>${patient.fullName}</strong>,</p>
+      <p>Hi <strong>${patient.full_name || patient.fullName}</strong>,</p>
       <p>Your appointment has been successfully booked. Here are your details:</p>
       <table style="width:100%; border-collapse: collapse; margin: 16px 0;">
         <tr><td style="padding: 8px; color: #555;">Doctor</td>
-            <td style="padding: 8px;"><strong>${doctor.fullName}</strong></td></tr>
+            <td style="padding: 8px;"><strong>${doctor.full_name || doctor.fullName}</strong></td></tr>
         <tr style="background:#f5f5f5"><td style="padding: 8px; color: #555;">Specialization</td>
             <td style="padding: 8px;">${doctor.specialization}</td></tr>
         <tr><td style="padding: 8px; color: #555;">Date</td>
@@ -37,7 +37,7 @@ export const sendBookingConfirmationEmail = async ({ appointment, patient, docto
         </p>
       </div>
 
-      <a href="${process.env.FRONTEND_URL}/cancel/${appointment._id}/${appointment.cancel_token}"
+      <a href="${process.env.FRONTEND_URL}/cancel/${id}/${appointment.cancel_token}"
         style="display:inline-block; margin-top:8px; padding:10px 20px; background:#dc2626; color:white;
                border-radius:8px; text-decoration:none; font-size:13px; font-weight:500;">
         Cancel appointment
@@ -50,7 +50,7 @@ export const sendBookingConfirmationEmail = async ({ appointment, patient, docto
     const res = await transporter.sendMail({
       from: `Booking Appointment <${process.env.EMAIL_USER}>`,
       to: patient.email,
-      subject: `Appointment confirmed — ${doctor?.fullName} on ${appointment_date}`,
+      subject: `Appointment confirmed — ${doctor?.full_name || doctor?.fullName} on ${appointment_date}`,
       html,
     });
     if (!res) {
@@ -102,7 +102,7 @@ export const sendWelcomeEmail = async ({ doctor, tempPassword }) => {
   const html = `
     <div style="font-family: sans-serif; max-width: 520px; margin: auto;">
       <h2 style="color: #0171be;">Welcome to MediBook 👋</h2>
-      <p>Hi <strong>Dr. ${doctor.fullName}</strong>,</p>
+      <p>Hi <strong>Dr. ${doctor.full_name || doctor.fullName}</strong>,</p>
       <p>Your account has been created. Use the credentials below to log in:</p>
 
       <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
@@ -146,13 +146,13 @@ export const sendReminderEmail = async ({ patient, doctor, appointment }) => {
   const html = `
     <div style="font-family: sans-serif; max-width: 520px; margin: auto;">
       <h2 style="color: #0171be;">Appointment reminder 🔔</h2>
-      <p>Hi <strong>${patient.fullName}</strong>,</p>
+      <p>Hi <strong>${patient.full_name || patient.fullName}</strong>,</p>
       <p>This is a reminder that you have an appointment <strong>tomorrow</strong>.</p>
 
       <table style="width:100%; border-collapse:collapse; margin: 16px 0;">
         <tr>
           <td style="padding:10px; background:#f5f5f5; color:#555;">Doctor</td>
-          <td style="padding:10px;"><strong>Dr. ${doctor.fullName}</strong></td>
+          <td style="padding:10px;"><strong>Dr. ${doctor.full_name || doctor.fullName}</strong></td>
         </tr>
         <tr>
           <td style="padding:10px; color:#555;">Specialization</td>
@@ -174,7 +174,7 @@ export const sendReminderEmail = async ({ patient, doctor, appointment }) => {
         </p>
       </div>
 
-      <a href="${process.env.FRONTEND_URL}/cancel/${appointment._id}/${appointment.cancel_token}"
+      <a href="${process.env.FRONTEND_URL}/cancel/${appointment.id || appointment._id}/${appointment.cancel_token}"
         style="display:inline-block; margin-top:8px; padding:10px 20px; background:#dc2626; color:white;
                border-radius:8px; text-decoration:none; font-size:13px; font-weight:500;">
         Cancel appointment
@@ -189,7 +189,7 @@ export const sendReminderEmail = async ({ patient, doctor, appointment }) => {
   await transporter.sendMail({
     from: `"MediBook Clinic" <${process.env.FROM_EMAIL}>`,
     to: patient.email,
-    subject: `Reminder: Appointment tomorrow with Dr. ${doctor.fullName} at ${appointment.appointment_time}`,
+    subject: `Reminder: Appointment tomorrow with Dr. ${doctor.full_name || doctor.fullName} at ${appointment.appointment_time}`,
     html,
   })
 }

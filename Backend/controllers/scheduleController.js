@@ -5,6 +5,8 @@ import { generateSlots, getDayAbb, isSlotBlocked } from "../utils/slotUtils.js"
 export const setDoctorSchedule = async (req, res) => {
     try {
         const { id: doctor_id } = req.params;
+        console.log("req: ", req.params)
+        console.log("doctorid: ", doctor_id)
         const { workingDays, startTime, endTime, slotDurationMin } = req.body;
 
         if (!workingDays || !startTime || !endTime || !slotDurationMin) {

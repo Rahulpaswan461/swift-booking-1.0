@@ -81,7 +81,7 @@ export default function AdminAppointments() {
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white">
               <option value="">All doctors</option>
               {doctors.map(d => (
-                <option key={d._id} value={d._id}>{d.fullName}</option>
+                <option key={d.id || d._id} value={d.id || d._id}>{d.full_name || d.fullName}</option>
               ))}
             </select>
           </div>

@@ -103,8 +103,17 @@ export default function BookAppointment() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-blue-50">
-      <header className="px-8 py-5">
+      <header className="px-8 py-5 flex items-center justify-between">
         <Logo />
+        <button 
+          onClick={() => navigate('/doctors')}
+          className="text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-3 py-1.5 transition hover:bg-gray-50 flex items-center gap-2"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M10 12l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Back
+        </button>
       </header>
 
       <div className="max-w-3xl mx-auto px-4 py-8">

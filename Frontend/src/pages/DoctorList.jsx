@@ -40,7 +40,7 @@ function DoctorCard({ doctor, onBook, animDelay }) {
       </div>
 
       <h3 className="font-display font-semibold text-gray-900 text-lg mb-0.5">
-        {doctor.fullName}
+        {doctor.full_name || doctor.fullName}
       </h3>
       <p className="text-brand-600 text-sm font-medium mb-1">{doctor.specialization || 'General Physician'}</p>
       <p className="text-gray-400 text-xs mb-4">{doctor.qualification || 'MBBS'}</p>
@@ -75,23 +75,34 @@ export default function DoctorList() {
   const specializations = ['All', ...new Set(doctors.map(d => d.specialization).filter(Boolean))]
 
   const filtered = doctors.filter(d => {
-    const matchSearch = d.fullName?.toLowerCase().includes(search.toLowerCase()) ||
+    const matchSearch = (d.full_name || d.fullName)?.toLowerCase().includes(search.toLowerCase()) ||
       d.specialization?.toLowerCase().includes(search.toLowerCase())
     const matchFilter = filter === 'All' || d.specialization === filter
     return matchSearch && matchFilter
   })
 
   const handleBook = (doctor) => {
-    navigate(`/book/${doctor._id}`, { state: { doctor } })
+    navigate(`/book/${doctor.id || doctor._id}`, { state: { doctor } })
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-blue-50">
       <header className="px-8 py-5 flex items-center justify-between">
         <Logo />
-        <span className="text-xs text-gray-400 bg-white border border-gray-100 rounded-full px-3 py-1.5">
-          {localStorage.getItem('otp_email')}
-        </span>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => navigate(-1)}
+            className="text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-3 py-1.5 transition hover:bg-gray-50 flex items-center gap-2"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M10 12l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Back
+          </button>
+          <span className="text-xs text-gray-400 bg-white border border-gray-100 rounded-full px-3 py-1.5">
+            {localStorage.getItem('otp_email')}
+          </span>
+        </div>
       </header>
 
       <div className="max-w-5xl mx-auto px-4 py-8">
@@ -158,7 +169,7 @@ export default function DoctorList() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((doctor, i) => (
-              <DoctorCard key={doctor._id} doctor={doctor} onBook={handleBook} animDelay={i * 80} />
+              <DoctorCard key={doctor.id || doctor._id} doctor={doctor} onBook={handleBook} animDelay={i * 80} />
             ))}
           </div>
         )}

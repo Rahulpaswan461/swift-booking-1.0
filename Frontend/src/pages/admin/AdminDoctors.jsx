@@ -65,8 +65,9 @@ export default function AdminDoctors() {
     setError('')
     setScheduleSubmitting(true)
     try {
-      await adminApi.post(`/admin/doctors/${scheduleDoctor._id}/schedule`, scheduleForm)
-      setSuccess(`Schedule updated for ${scheduleDoctor.fullName}.`)
+      const doctorId = scheduleDoctor.id || scheduleDoctor._id
+      await adminApi.post(`/admin/doctors/${doctorId}/schedule`, scheduleForm)
+      setSuccess(`Schedule updated for ${scheduleDoctor.full_name || scheduleDoctor.fullName}.`)
       setShowScheduleModal(false)
       setTimeout(() => setSuccess(''), 4000)
     } catch (err) {
@@ -134,7 +135,7 @@ export default function AdminDoctors() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {doctors.map((doctor, i) => (
-              <div key={doctor._id}
+              <div key={doctor.id || doctor._id}
                 className="bg-white border border-gray-100 rounded-2xl p-5 animate-fade-up opacity-0"
                 style={{ animationDelay: `${i * 60}ms`, animationFillMode: 'forwards' }}>
                 <div className="flex items-start justify-between mb-3">
@@ -161,7 +162,7 @@ export default function AdminDoctors() {
                     ⏱ Set Schedule
                   </button>
                   <button
-                    onClick={() => handleToggle(doctor._id, doctor.is_active)}
+                    onClick={() => handleToggle(doctor.id || doctor._id, doctor.is_active)}
                     className={`flex-1 py-2 rounded-xl text-xs font-medium transition border
                       ${doctor.is_active
                         ? 'border-red-200 text-red-600 hover:bg-red-50'

@@ -74,7 +74,7 @@ export default function MyAppointment() {
   );
 
   if (error) return (
-    <PageLayout>
+    <PageLayout showBackButton={true}>
       <div className="text-center py-16">
         <p className="text-4xl mb-3">😕</p>
         <p className="text-gray-600 font-medium">{error}</p>
@@ -88,7 +88,7 @@ export default function MyAppointment() {
   const isCancellable = appointment?.status === 'confirmed' || appointment?.status === 'pending';
 
   return (
-    <PageLayout>
+    <PageLayout showBackButton={true} onBack={() => navigate(-1)}>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">My appointment</h1>
         <p className="text-gray-500 text-sm mt-1">Booking details</p>

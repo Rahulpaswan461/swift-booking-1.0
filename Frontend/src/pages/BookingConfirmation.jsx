@@ -35,8 +35,17 @@ export default function BookingConfirmation() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-brand-50 flex flex-col">
-      <header className="px-8 py-5">
+      <header className="px-8 py-5 flex items-center justify-between">
         <Logo />
+        <button 
+          onClick={() => navigate('/')}
+          className="text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-3 py-1.5 transition hover:bg-gray-50 flex items-center gap-2"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M10 12l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Back
+        </button>
       </header>
 
       <div className="flex-1 flex items-center justify-center px-4 py-12">
@@ -107,12 +116,6 @@ export default function BookingConfirmation() {
                   Confirmed
                 </span>
               </div>
-            </div>
-
-            {/* Appointment ID */}
-            <div className="bg-brand-50 rounded-lg px-4 py-2.5 mb-5">
-              <p className="text-xs text-gray-400 mb-0.5">Appointment ID</p>
-              <p className="text-xs font-mono text-brand-700 break-all">{appointment._id || appointment.appointment_id}</p>
             </div>
 
             <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-left mb-2">
