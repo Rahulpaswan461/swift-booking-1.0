@@ -6,7 +6,6 @@ import { sendOtpEmail } from "../services/emailService.js"
 export const sendOtp = async (req, res) => {
     try {
         const { email } = req.body;
-        console.log("function called: ")
 
         if (!email) {
             return res.status(400).json({ success: false, message: 'Please provide email.' })
