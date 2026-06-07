@@ -89,12 +89,16 @@ export default function OtpVerification() {
     : ''
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-blue-50 flex flex-col">
-      <header className="px-8 py-5 flex items-center justify-between">
-        <Logo />
+    <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-brand-50 flex flex-col">
+      <header className="px-6 sm:px-8 py-6 flex items-center justify-between border-b border-gray-100 bg-white">
+        <div className="flex items-center gap-3">
+          <Logo />
+          <div className="h-8 w-px bg-gray-100" />
+          <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Verification</span>
+        </div>
         <button 
           onClick={() => navigate(-1)}
-          className="text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-3 py-1.5 transition hover:bg-gray-50 flex items-center gap-2"
+          className="text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-4 py-2 transition hover:bg-gray-50 flex items-center gap-2 font-medium"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M10 12l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round"/>
@@ -107,24 +111,24 @@ export default function OtpVerification() {
         <div className="w-full max-w-md">
           <StepIndicator current={1} />
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 animate-fade-up">
-            <div className="w-12 h-12 bg-brand-50 rounded-xl flex items-center justify-center mb-5">
-              <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 sm:p-10 animate-fade-up">
+            <div className="w-14 h-14 bg-gradient-to-br from-brand-100 to-brand-200 rounded-2xl flex items-center justify-center mb-6 mx-auto">
+              <svg width="24" height="24" viewBox="0 0 22 22" fill="none">
                 <rect x="3" y="8" width="16" height="12" rx="2" stroke="#0171be" strokeWidth="1.8"/>
                 <path d="M7 8V6a4 4 0 018 0v2" stroke="#0171be" strokeWidth="1.8" strokeLinecap="round"/>
                 <circle cx="11" cy="14" r="1.5" fill="#0171be"/>
               </svg>
             </div>
 
-            <h1 className="text-2xl font-display font-semibold text-gray-900 mb-1">
-              Enter your code
+            <h1 className="text-3xl font-display font-semibold text-center text-gray-900 mb-2">
+              Verify your email
             </h1>
-            <p className="text-gray-500 text-sm mb-6">
-              We sent a 6-digit code to <span className="font-medium text-gray-700">{maskedEmail}</span>
+            <p className="text-gray-500 text-sm text-center mb-8">
+              We sent a 6-digit verification code to<br/><span className="font-semibold text-gray-700">{maskedEmail}</span>
             </p>
 
             {/* OTP Input Grid */}
-            <div className="flex gap-2.5 mb-5" onPaste={handlePaste}>
+            <div className="flex gap-2.5 mb-7" onPaste={handlePaste}>
               {otp.map((digit, idx) => (
                 <input
                   key={idx}
@@ -136,54 +140,54 @@ export default function OtpVerification() {
                   onChange={e => handleChange(e.target.value, idx)}
                   onKeyDown={e => handleKeyDown(e, idx)}
                   disabled={loading}
-                  className={`w-full aspect-square text-center text-xl font-semibold border rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition
-                    ${digit ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-gray-200 bg-gray-50 text-gray-900'}
-                    ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`w-full aspect-square text-center text-2xl font-bold border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-400 transition
+                    ${digit ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-gray-200 bg-gray-50 text-gray-900'}
+                    ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:border-brand-200'}`}
                 />
               ))}
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-4">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <div className="flex items-start gap-3 text-red-600 text-sm bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 14 14" fill="none">
                   <circle cx="7" cy="7" r="6" stroke="#dc2626" strokeWidth="1.5"/>
                   <path d="M7 4v3M7 9.5v.5" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
-                {error}
+                <span>{error}</span>
               </div>
             )}
 
             {success && (
-              <div className="flex items-center gap-2 text-green-600 text-sm bg-green-50 border border-green-100 rounded-lg px-3 py-2 mb-4">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <div className="flex items-start gap-3 text-green-600 text-sm bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4">
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 14 14" fill="none">
                   <circle cx="7" cy="7" r="6" stroke="#16a34a" strokeWidth="1.5"/>
                   <path d="M4 7l2 2 4-4" stroke="#16a34a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                {success}
+                <span>{success}</span>
               </div>
             )}
 
             {loading && (
-              <div className="flex items-center justify-center gap-2 text-brand-600 text-sm py-2">
-                <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <div className="flex items-center justify-center gap-2 text-brand-600 text-sm py-3 mb-4">
+                <svg className="animate-spin w-4 h-4" viewBox="0 0 16 16" fill="none">
                   <circle cx="8" cy="8" r="6" stroke="#0171be" strokeWidth="2" strokeOpacity="0.3"/>
                   <path d="M14 8a6 6 0 00-6-6" stroke="#0171be" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
-                Verifying...
+                <span className="font-medium">Verifying your code...</span>
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-2 border-t border-gray-100 mt-4">
+            <div className="flex items-center justify-between pt-6 border-t border-gray-100">
               <button
                 onClick={() => navigate('/')}
-                className="text-sm text-gray-400 hover:text-gray-600 transition"
+                className="text-sm text-gray-500 hover:text-gray-700 font-medium transition"
               >
                 ← Change email
               </button>
               <button
                 onClick={handleResend}
                 disabled={countdown > 0 || resending}
-                className="text-sm font-medium text-brand-600 hover:text-brand-800 disabled:text-gray-300 disabled:cursor-not-allowed transition"
+                className="text-sm font-semibold text-brand-600 hover:text-brand-700 disabled:text-gray-300 disabled:cursor-not-allowed transition"
               >
                 {resending ? 'Sending...' : countdown > 0 ? `Resend in ${countdown}s` : 'Resend code'}
               </button>

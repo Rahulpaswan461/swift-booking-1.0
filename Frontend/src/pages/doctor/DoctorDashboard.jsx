@@ -10,17 +10,26 @@ function formatTime(t) {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
 }
 
-function StatCard({ label, value, color }) {
-  const colors = {
-    blue: 'bg-blue-50 text-blue-700 border-blue-100',
-    green: 'bg-green-50 text-green-700 border-green-100',
-    amber: 'bg-amber-50 text-amber-700 border-amber-100',
-    gray: 'bg-gray-50 text-gray-600 border-gray-100',
+function StatCard({ label, value, color, icon }) {
+  const colorMap = {
+    blue: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-100', icon: 'text-blue-600' },
+    green: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-100', icon: 'text-green-600' },
+    amber: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-100', icon: 'text-amber-600' },
+    gray: { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-100', icon: 'text-gray-500' },
   }
+  const style = colorMap[color]
+  
   return (
-    <div className={`rounded-xl border p-4 ${colors[color]}`}>
-      <p className="text-2xl font-bold">{value}</p>
-      <p className="text-xs font-medium mt-0.5 opacity-80">{label}</p>
+    <div className={`rounded-2xl border-2 p-6 ${style.bg} ${style.border}`}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className={`text-3xl font-bold ${style.text}`}>{value}</p>
+          <p className={`text-xs font-semibold mt-1 ${style.text} opacity-80 uppercase tracking-wide`}>{label}</p>
+        </div>
+        {icon && (
+          <div className={`text-2xl ${style.icon}`}>{icon}</div>
+        )}
+      </div>
     </div>
   )
 }
@@ -79,30 +88,30 @@ export default function DoctorDashboard() {
     <div className="flex min-h-screen bg-gray-50">
       <DoctorSidebar />
 
-      <main className="flex-1 p-8 overflow-auto">
+      <main className="flex-1 p-6 sm:p-8 overflow-auto">
         {/* Header */}
-        <div className="mb-7">
-          <h1 className="text-2xl font-display font-semibold text-gray-900">
-            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'},{doctor.fullName?.split(' ')[0]} 👋
+        <div className="mb-10">
+          <h1 className="text-4xl font-display font-bold text-gray-900">
+            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, Dr. {doctor.fullName?.split(' ')[0]} 👋
           </h1>
-          <p className="text-gray-500 text-sm mt-0.5">
+          <p className="text-gray-600 text-lg mt-2">
             {isToday ? "Here's your schedule for today" : `Appointments for ${new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`}
           </p>
         </div>
 
         {/* Date Selector */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+        <div className="flex gap-3 mb-8 overflow-x-auto pb-2 scrollbar-hide">
           {days.map(day => {
             const d = new Date(day)
             const isActive = selectedDate === day
             const todayStr = new Date().toISOString().split('T')[0]
             return (
               <button key={day} onClick={() => setSelectedDate(day)}
-                className={`flex-shrink-0 flex flex-col items-center w-14 py-2.5 rounded-xl border text-sm transition-all
-                  ${isActive ? 'bg-brand-600 border-brand-600 text-white' : 'bg-white border-gray-200 text-gray-600 hover:border-brand-300'}`}>
+                className={`flex-shrink-0 flex flex-col items-center gap-1.5 px-4 py-3 rounded-2xl border-2 text-sm transition-all font-semibold
+                  ${isActive ? 'bg-brand-600 border-brand-600 text-white shadow-lg shadow-brand-600/30' : 'bg-white border-gray-200 text-gray-700 hover:border-brand-300 hover:bg-brand-50'}`}>
                 <span className="text-xs opacity-75">{d.toLocaleDateString('en-US', { weekday: 'short' })}</span>
-                <span className="font-bold text-base leading-tight">{d.getDate()}</span>
-                {day === todayStr && <span className={`text-xs mt-0.5 ${isActive ? 'opacity-75' : 'text-brand-600'}`}>Today</span>}
+                <span className="text-lg leading-tight">{d.getDate()}</span>
+                {day === todayStr && <span className={`text-xs ${isActive ? 'opacity-75' : 'text-brand-600 font-bold'}`}>Today</span>}
               </button>
             )
           })}
@@ -110,74 +119,78 @@ export default function DoctorDashboard() {
 
         {/* Stats */}
         {data && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            <StatCard label="Total" value={data.summary.total} color="blue" />
-            <StatCard label="Pending" value={data.summary.pending} color="gray" />
-            <StatCard label="Completed" value={data.summary.completed} color="green" />
-            <StatCard label="No Show" value={data.summary.no_show} color="amber" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <StatCard label="Total" value={data.summary.total} color="blue" icon="📊" />
+            <StatCard label="Pending" value={data.summary.pending} color="gray" icon="⏳" />
+            <StatCard label="Completed" value={data.summary.completed} color="green" icon="✅" />
+            <StatCard label="No Show" value={data.summary.no_show} color="amber" icon="❌" />
           </div>
         )}
 
         {/* Appointments List */}
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-800">Appointments</h2>
-            {data && <span className="text-xs text-gray-400">{data.summary.total} total</span>}
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="px-6 sm:px-8 py-5 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
+            <h2 className="font-display font-bold text-gray-900 text-lg">Appointments</h2>
+            {data && <span className="text-sm text-gray-500 font-semibold">{data.summary.total} total</span>}
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-16 text-gray-400 text-sm gap-2">
-              <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
-                <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              Loading appointments...
+            <div className="flex items-center justify-center py-20 text-gray-400">
+              <div className="text-center">
+                <svg className="animate-spin w-8 h-8 mx-auto mb-3" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
+                  <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <p className="font-medium">Loading appointments...</p>
+              </div>
             </div>
           ) : !data?.data?.length ? (
-            <div className="text-center py-16 text-gray-400">
-              <div className="text-4xl mb-3">📅</div>
-              <p className="font-medium">No appointments</p>
-              <p className="text-xs mt-1">Nothing scheduled for this day</p>
+            <div className="text-center py-20 text-gray-400">
+              <div className="text-5xl mb-4">📅</div>
+              <p className="font-bold text-lg">No appointments scheduled</p>
+              <p className="text-sm mt-1">There are no appointments for this day</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-gray-100">
               {data.data.map((appt, i) => (
                 <div key={appt.id}
-                  className="px-5 py-4 flex items-center gap-4 hover:bg-gray-50 transition animate-fade-up opacity-0"
+                  className="px-6 sm:px-8 py-5 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-blue-50 transition animate-fade-up opacity-0"
                   style={{ animationDelay: `${i * 50}ms`, animationFillMode: 'forwards' }}>
 
-                  {/* Time */}
-                  <div className="w-16 flex-shrink-0 text-center">
-                    <p className="text-sm font-bold text-brand-700">{formatTime(appt.appointment_time)}</p>
+                  {/* Time Badge */}
+                  <div className="flex-shrink-0">
+                    <div className="bg-brand-100 rounded-2xl px-4 py-3 text-center border border-brand-200">
+                      <p className="text-lg font-bold text-brand-700">{formatTime(appt.appointment_time)}</p>
+                      <p className="text-xs text-brand-600 font-semibold mt-1">Scheduled</p>
+                    </div>
                   </div>
 
-                  {/* Divider */}
-                  <div className="w-px h-10 bg-gray-200 flex-shrink-0" />
-
-                  {/* Patient info */}
+                  {/* Patient Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">{appt.patient.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5 truncate">
-                      {appt.notes || 'No notes provided'} · {appt.patient.phone}
+                    <p className="text-base font-bold text-gray-900">{appt.patient.name}</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      📞 {appt.patient.phone} {appt.notes && `• ${appt.notes}`}
                     </p>
                   </div>
 
                   {/* Status */}
-                  <StatusBadge status={appt.status} />
+                  <div className="flex-shrink-0">
+                    <StatusBadge status={appt.status} />
+                  </div>
 
-                  {/* Actions — only show for confirmed appointments */}
+                  {/* Actions */}
                   {appt.status === 'confirmed' && (
                     <div className="flex gap-2 flex-shrink-0">
                       <button
                         onClick={() => handleStatusUpdate(appt.id, 'completed')}
                         disabled={updating === appt.id}
-                        className="px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-medium rounded-lg border border-green-200 transition disabled:opacity-50">
-                        {updating === appt.id ? '...' : '✓ Done'}
+                        className="px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 text-sm font-bold rounded-lg border-2 border-green-200 transition disabled:opacity-50 shadow-sm hover:shadow-md">
+                        {updating === appt.id ? '...' : '✓ Mark Done'}
                       </button>
                       <button
                         onClick={() => handleStatusUpdate(appt.id, 'no_show')}
                         disabled={updating === appt.id}
-                        className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-medium rounded-lg border border-amber-200 transition disabled:opacity-50">
+                        className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-sm font-bold rounded-lg border-2 border-amber-200 transition disabled:opacity-50 shadow-sm hover:shadow-md">
                         No Show
                       </button>
                     </div>

@@ -34,12 +34,12 @@ export default function BookingConfirmation() {
   if (!appointment) return null
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-brand-50 flex flex-col">
-      <header className="px-8 py-5 flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 flex flex-col">
+      <header className="px-6 sm:px-8 py-6 flex items-center justify-between border-b border-gray-100 bg-white/80 backdrop-blur-sm">
         <Logo />
         <button 
           onClick={() => navigate('/')}
-          className="text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-3 py-1.5 transition hover:bg-gray-50 flex items-center gap-2"
+          className="text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-4 py-2 transition hover:bg-gray-50 flex items-center gap-2 font-medium"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M10 12l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round"/>
@@ -51,87 +51,113 @@ export default function BookingConfirmation() {
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
 
-          {/* Success Icon */}
-          <div className="flex justify-center mb-6">
-            <div className="relative w-20 h-20">
-              <svg width="80" height="80" viewBox="0 0 80 80">
-                <circle cx="40" cy="40" r="36" fill="#f0fdf4" stroke="#bbf7d0" strokeWidth="2" />
+          {/* Success Animation */}
+          <div className="flex justify-center mb-8 animate-fade-up">
+            <div className="relative w-24 h-24">
+              <svg width="96" height="96" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="36" fill="#d1fae5" stroke="#6ee7b7" strokeWidth="2" />
                 <circle
                   cx="40" cy="40" r="30"
                   fill="none"
-                  stroke="#16a34a"
+                  stroke="#10b981"
                   strokeWidth="3"
                   strokeDasharray="188"
-                  strokeDashoffset="188"
+                  strokeDashoffset="0"
                   strokeLinecap="round"
                   ref={checkRef}
-                  style={{ transition: 'stroke-dashoffset 0.8s ease', strokeDashoffset: '0' }}
+                  style={{ transition: 'stroke-dashoffset 0.8s ease' }}
                 />
                 <path
                   d="M26 40l10 10 18-18"
                   fill="none"
-                  stroke="#16a34a"
-                  strokeWidth="3.5"
+                  stroke="#10b981"
+                  strokeWidth="4"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  opacity="0"
+                  style={{ animation: 'fadeIn 0.6s ease 0.4s forwards' }}
                 />
               </svg>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-7 animate-fade-up text-center mb-4">
-            <h1 className="text-2xl font-display font-semibold text-gray-900 mb-1">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 sm:p-10 animate-fade-up text-center mb-6">
+            <h1 className="text-4xl font-display font-bold text-gray-900 mb-3">
               Appointment confirmed!
             </h1>
-            <p className="text-gray-500 text-sm mb-6">
-              A confirmation has been sent to your email.
+            <p className="text-gray-600 text-base mb-8">
+              Your booking is complete. A confirmation email has been sent to your inbox with all the details.
             </p>
 
-            {/* Details */}
-            <div className="bg-gray-50 rounded-xl p-4 text-left space-y-3 mb-5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Doctor</span>
-                <span className="text-sm font-semibold text-gray-800">Dr. {doctor?.fullName || appointment?.doctor}</span>
-              </div>
-              <div className="h-px bg-gray-100" />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Specialty</span>
-                <span className="text-sm text-gray-700">{doctor?.specialization || '—'}</span>
-              </div>
-              <div className="h-px bg-gray-100" />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Date</span>
-                <span className="text-sm text-gray-700">{formatDate(appointment.appointment_date)}</span>
-              </div>
-              <div className="h-px bg-gray-100" />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Time</span>
-                <span className="text-sm font-semibold text-brand-700">{formatTime(appointment.appointment_time)}</span>
-              </div>
-              <div className="h-px bg-gray-100" />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Status</span>
-                <span className="flex items-center gap-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-100 rounded-full px-2.5 py-1">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                  Confirmed
-                </span>
+            {/* Appointment Details Card */}
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 text-left space-y-4 mb-8 border border-green-100">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-4 border-b border-green-100">
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">🩺 Doctor</span>
+                  <span className="text-sm font-bold text-gray-900">Dr. {doctor?.fullName || appointment?.doctor}</span>
+                </div>
+                
+                <div className="flex items-center justify-between pb-4 border-b border-green-100">
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">📋 Specialty</span>
+                  <span className="text-sm text-gray-700 font-medium">{doctor?.specialization || '—'}</span>
+                </div>
+                
+                <div className="flex items-center justify-between pb-4 border-b border-green-100">
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">📅 Date</span>
+                  <span className="text-sm font-bold text-green-700">{formatDate(appointment.appointment_date)}</span>
+                </div>
+                
+                <div className="flex items-center justify-between pb-4 border-b border-green-100">
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">🕐 Time</span>
+                  <span className="text-sm font-bold text-green-700">{formatTime(appointment.appointment_time)}</span>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">✓ Status</span>
+                  <span className="flex items-center gap-2 text-xs font-bold text-white bg-green-600 rounded-full px-3 py-1.5">
+                    <span className="w-2 h-2 bg-white rounded-full"></span>
+                    Confirmed
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-left mb-2">
-              <p className="text-xs text-amber-700 font-medium">📌 Reminder</p>
-              <p className="text-xs text-amber-600 mt-0.5">Please arrive 10 minutes before your scheduled time.</p>
+            {/* Important Reminder */}
+            <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl px-6 py-4 mb-6">
+              <p className="text-sm text-amber-900 font-semibold mb-1">📌 Important Reminder</p>
+              <p className="text-sm text-amber-800">Please arrive <strong>10-15 minutes early</strong> to complete check-in. Bring any relevant medical documents if needed.</p>
+            </div>
+
+            {/* What to expect */}
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl px-6 py-4 mb-8">
+              <p className="text-sm text-blue-900 font-semibold mb-2">💡 What to Expect</p>
+              <ul className="text-sm text-blue-800 space-y-1 text-left">
+                <li>• Arrive early for check-in</li>
+                <li>• Bring your insurance card & ID</li>
+                <li>• Prepare a list of medications</li>
+                <li>• Share any recent health concerns</li>
+              </ul>
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              navigate('/doctors')
-            }}
-            className="w-full bg-white hover:bg-gray-50 text-gray-600 font-medium py-3 rounded-xl text-sm transition border border-gray-200"
-          >
-            Book another appointment
-          </button>
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={() => {
+                navigate('/doctors')
+              }}
+              className="bg-white hover:bg-gray-50 text-gray-700 font-semibold py-3 rounded-xl text-sm transition border-2 border-gray-200"
+            >
+              ← Back to doctors
+            </button>
+            <button
+              onClick={() => {
+                navigate('/')
+              }}
+              className="bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-xl text-sm transition shadow-lg shadow-brand-600/20"
+            >
+              Go to home
+            </button>
+          </div>
         </div>
       </div>
     </div>

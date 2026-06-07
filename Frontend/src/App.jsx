@@ -7,6 +7,7 @@ import DoctorList          from './pages/DoctorList'
 import BookAppointment     from './pages/BookAppointment'
 import BookingConfirmation from './pages/BookingConfirmation'
 import CancelAppointment   from './pages/CancelAppointment'
+import RescheduleAppointment from './pages/RescheduleAppointment'
 
 // Doctor pages
 import DoctorLogin     from './pages/doctor/DoctorLogin'
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/book/:doctorId" element={<PatientRoute><BookAppointment /></PatientRoute>} />
         <Route path="/confirmation"  element={<PatientRoute><BookingConfirmation /></PatientRoute>} />
         <Route path="/cancel/:id/:cancelToken" element={<CancelAppointment />} />
+        <Route path="/reschedule/:id/:cancelToken" element={<RescheduleAppointment />} />
 
         {/* ── Doctor flow ────────────────────────────── */}
         <Route path="/doctor/login"            element={<DoctorLogin />} />
