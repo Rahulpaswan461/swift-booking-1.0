@@ -1,2 +1,10 @@
 .env
 node_modules
+# Added by code-review-graph
+.code-review-graph/
+migrations
+.claude
+.env.example
+MIGRATION_COMPLETE.md
+SUPABASE_SETUP.md
+CLAUDE.md

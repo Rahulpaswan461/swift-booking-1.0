@@ -1,5 +1,5 @@
 export default function StepIndicator({ current }) {
-  const steps = ['Verify Email', 'Choose Doctor', 'Book Slot']
+  const steps = ['Verify', 'Choose Doctor', 'Book Slot']
   return (
     <div className="flex items-center gap-0 mb-8">
       {steps.map((step, i) => {

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import Logo from '../components/Logo'
 import StepIndicator from '../components/StepIndicator'
+import { useAuth } from '../context/AuthContext'
 
 export default function OtpVerification() {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
@@ -10,13 +11,18 @@ export default function OtpVerification() {
   const [resending, setResending] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [countdown, setCountdown] = useState(60)
+  // Matches the backend OTP TTL (30s) — doubles as the expiry indicator
+  const OTP_TTL = 30
+  const [countdown, setCountdown] = useState(OTP_TTL)
   const refs = useRef([])
   const navigate = useNavigate()
-  const email = localStorage.getItem('otp_email')
+  const { savePatient } = useAuth()
+
+  const contactValue = localStorage.getItem('otp_contact')
+  const contactType = localStorage.getItem('otp_contact_type') || 'email'
 
   useEffect(() => {
-    if (!email) navigate('/')
+    if (!contactValue) navigate('/')
     refs.current[0]?.focus()
   }, [])
 
@@ -57,8 +63,26 @@ export default function OtpVerification() {
     setError('')
     setLoading(true)
     try {
-      const res = await api.post('/auth/verify-otp', { email, otp: code })
-      localStorage.setItem('token', res.data.token)
+      const res = await api.post('/auth/verify', {
+        contact_value: contactValue,
+        contact_type: contactType,
+        otp_code: code,
+      })
+      console.log('res ', res)
+      // Save patient token AND patient_id using the new context method
+      savePatient(res.data.token, res.data.patient_id, contactValue, contactType)
+
+      // Fetch clinic info for branding
+      try {
+        const clinicRes = await api.get('/clinic/info')
+        if (clinicRes.data.data) {
+          localStorage.setItem('clinic_info', JSON.stringify(clinicRes.data.data))
+        }
+      } catch (clinicErr) {
+        // Non-critical — clinic info is optional
+        console.warn('Failed to fetch clinic info:', clinicErr)
+      }
+
       navigate('/doctors')
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid OTP. Please try again.')
@@ -73,9 +97,14 @@ export default function OtpVerification() {
     setResending(true)
     setError('')
     try {
-      await api.post('/auth/send-otp', { email })
+      await api.post('/auth/request', {
+        contact_value: contactValue,
+        contact_type: contactType,
+      })
       setSuccess('New OTP sent!')
-      setCountdown(60)
+      setOtp(['', '', '', '', '', ''])
+      refs.current[0]?.focus()
+      setCountdown(OTP_TTL)
       setTimeout(() => setSuccess(''), 3000)
     } catch (err) {
       setError('Failed to resend. Please try again.')
@@ -84,19 +113,26 @@ export default function OtpVerification() {
     }
   }
 
-  const maskedEmail = email
-    ? email.replace(/(.{2})(.*)(@.*)/, (_, a, b, c) => a + '*'.repeat(b.length) + c)
-    : ''
+  const maskedContact = () => {
+    if (contactType === 'email') {
+      return contactValue.replace(/(.{2})(.*)(@.*)/, (_, a, b, c) => a + '*'.repeat(b.length) + c)
+    }
+    // Phone: show first 3 and last 3, mask the rest
+    const digits = contactValue.replace(/\D/g, '')
+    return digits.length > 6
+      ? digits.slice(0, 3) + '*'.repeat(digits.length - 6) + digits.slice(-3)
+      : contactValue
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-brand-50 flex flex-col">
       <header className="px-6 sm:px-8 py-6 flex items-center justify-between border-b border-gray-100 bg-white">
         <div className="flex items-center gap-3">
-          <Logo />
+          <Logo showClinicName />
           <div className="h-8 w-px bg-gray-100" />
           <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Verification</span>
         </div>
-        <button 
+        <button
           onClick={() => navigate(-1)}
           className="text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-4 py-2 transition hover:bg-gray-50 flex items-center gap-2 font-medium"
         >
@@ -121,10 +157,17 @@ export default function OtpVerification() {
             </div>
 
             <h1 className="text-3xl font-display font-semibold text-center text-gray-900 mb-2">
-              Verify your email
+              Verify your {contactType}
             </h1>
-            <p className="text-gray-500 text-sm text-center mb-8">
-              We sent a 6-digit verification code to<br/><span className="font-semibold text-gray-700">{maskedEmail}</span>
+            <p className="text-gray-500 text-sm text-center mb-4">
+              We sent a 6-digit verification code to<br/><span className="font-semibold text-gray-700">{maskedContact()}</span>
+            </p>
+
+            {/* Expiry countdown — matches backend TTL */}
+            <p className={`text-xs text-center mb-6 font-semibold ${countdown > 0 ? 'text-gray-400' : 'text-red-500'}`}>
+              {countdown > 0
+                ? `Code expires in ${countdown}s`
+                : 'Code expired — request a new one below'}
             </p>
 
             {/* OTP Input Grid */}
@@ -179,17 +222,17 @@ export default function OtpVerification() {
 
             <div className="flex items-center justify-between pt-6 border-t border-gray-100">
               <button
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/verify')}
                 className="text-sm text-gray-500 hover:text-gray-700 font-medium transition"
               >
-                ← Change email
+                ← Change {contactType}
               </button>
               <button
                 onClick={handleResend}
                 disabled={countdown > 0 || resending}
                 className="text-sm font-semibold text-brand-600 hover:text-brand-700 disabled:text-gray-300 disabled:cursor-not-allowed transition"
               >
-                {resending ? 'Sending...' : countdown > 0 ? `Resend in ${countdown}s` : 'Resend code'}
+                {resending ? 'Sending...' : countdown > 0 ? `Resend available in ${countdown}s` : 'Resend code'}
               </button>
             </div>
           </div>

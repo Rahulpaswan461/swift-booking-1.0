@@ -4,24 +4,27 @@ import { generateSlots, getDayAbb, isSlotBlocked } from "../utils/slotUtils.js"
 // Admin sets or updates a doctor's default weekly schedule
 export const setDoctorSchedule = async (req, res) => {
     try {
+        const clinicId = req.admin?.clinic_id
         const { id: doctor_id } = req.params;
-        console.log("req: ", req.params)
-        console.log("doctorid: ", doctor_id)
         const { workingDays, startTime, endTime, slotDurationMin } = req.body;
 
         if (!workingDays || !startTime || !endTime || !slotDurationMin) {
             return res.status(400).json({ message: "Please provide all the fields" })
         }
 
-        // Check if doctor exists
+        // Check if doctor exists and belongs to this admin's clinic
         const { data: doctor, error: doctorError } = await supabase
             .from('doctors')
-            .select('id')
+            .select('id, clinic_id')
             .eq('id', doctor_id)
             .single()
 
         if (doctorError || !doctor) {
             return res.status(400).json({ message: "Doctor not found" })
+        }
+
+        if (clinicId && doctor.clinic_id !== clinicId) {
+            return res.status(403).json({ message: "Doctor does not belong to your clinic" })
         }
 
         // Upsert schedule (insert if new, update if exists)
@@ -55,6 +58,7 @@ export const setDoctorSchedule = async (req, res) => {
 // Mark the doctor as unavailable
 export const addUnavailability = async (req, res) => {
     try {
+        const clinicId = req.admin?.clinic_id
         const { id: doctorId } = req.params;
         const { date, startTime, endTime, reason } = req.body;
 
@@ -62,15 +66,19 @@ export const addUnavailability = async (req, res) => {
             return res.status(400).json({ success: false, message: "Date is required" })
         }
 
-        // Check if doctor exists
+        // Check if doctor exists and belongs to this admin's clinic
         const { data: doctor, error: doctorError } = await supabase
             .from('doctors')
-            .select('id')
+            .select('id, clinic_id')
             .eq('id', doctorId)
             .single()
 
         if (doctorError || !doctor) {
             return res.status(404).json({ success: false, message: 'Doctor not found.' })
+        }
+
+        if (clinicId && doctor.clinic_id !== clinicId) {
+            return res.status(403).json({ success: false, message: 'Doctor does not belong to your clinic.' })
         }
 
         const { data: unavailability, error } = await supabase
@@ -101,9 +109,25 @@ export const getDoctorSlots = async (req, res) => {
     try {
         const { id: doctorId } = req.params;
         const { date } = req.query
+        const clinicId = req.tenant?.id
 
         if (!date) {
             return res.status(400).json({ success: false, message: "date query params is required" })
+        }
+
+        if (!clinicId) {
+            return res.status(400).json({ success: false, message: "Clinic context is required. Access through your clinic subdomain." })
+        }
+
+        // 0. Doctor must belong to the resolved clinic (tenant isolation)
+        const { data: slotDoctor } = await supabase
+            .from('doctors')
+            .select('id, clinic_id')
+            .eq('id', doctorId)
+            .single()
+
+        if (!slotDoctor || slotDoctor.clinic_id !== clinicId) {
+            return res.status(404).json({ success: false, message: 'Doctor not found at this clinic.' })
         }
 
         // 1. Get doctor's default schedule
@@ -117,11 +141,8 @@ export const getDoctorSlots = async (req, res) => {
             return res.status(400).json({ success: false, message: 'No schedule set for this doctor.' })
         }
 
-        console.log("schedule of the doctor: ", schedule)
-
         // 2. Check if requested date is working day
         const dayAbbr = getDayAbb(date)
-        console.log("Day abbr: ", dayAbbr)
         if (!schedule.working_days.includes(dayAbbr)) {
             return res.status(200).json({ success: true, availableSlots: [], message: "Doctor is off on this day." })
         }
@@ -145,20 +166,15 @@ export const getDoctorSlots = async (req, res) => {
 
         if (appointmentsError) throw appointmentsError
 
-        console.log("booked appointment: ", bookedAppointments)
-
         const bookedTimes = bookedAppointments?.map(a => a.appointment_time) || []
 
         // 6. Filter out blocked and booked slots
-        console.log("all slots: ", allSlots)
-        console.log("bookedTimes: ", bookedTimes)
         const availableSlots = allSlots.filter(slot => {
             const isBooked = bookedTimes.includes(slot);
-            const isBlocked = isSlotBlocked(slot, unavailabilities?.[0])
+            const isBlocked = isSlotBlocked(slot, date, schedule.slot_duration_min, unavailabilities)
 
             return !isBooked && !isBlocked;
         })
-        console.log("available slots: ", availableSlots)
 
         return res.status(200).json({
             success: true,

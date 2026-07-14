@@ -15,10 +15,9 @@ export default function DoctorLogin() {
     setError('')
     setLoading(true)
     try {
-      const res = await doctorApi.post('/doctors/login', form)
+      const res = await doctorApi.post('/doctor/login', form)
       localStorage.setItem('doctor_token', res.data.token)
       localStorage.setItem('doctor', JSON.stringify(res.data.doctor))
-      console.log("cred after first login: ", res)
 
       if (res.data.first_login) {
         navigate('/doctor/change-password')
@@ -33,20 +32,20 @@ export default function DoctorLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-blue-50 flex flex-col">
-      <header className="px-6 sm:px-8 py-6 flex items-center justify-between border-b border-gray-100 bg-white/80 backdrop-blur-sm">
+    <div className="flex min-h-screen flex-col bg-surface-50">
+      <header className="flex items-center justify-between border-b border-white/70 bg-white/80 px-6 py-5 backdrop-blur-xl sm:px-8">
         <Logo />
-        <span className="text-xs font-bold text-brand-600 bg-brand-50 border border-brand-200 rounded-full px-3 py-1.5 uppercase tracking-wider">Doctor Portal</span>
+        <span className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-brand-700">Doctor Portal</span>
       </header>
 
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 sm:p-10 animate-fade-up">
+          <div className="rounded-[28px] border border-surface-100 bg-white p-8 shadow-xl shadow-gray-900/5 animate-fade-up sm:p-10">
             {/* Icon with gradient background */}
-            <div className="w-16 h-16 bg-gradient-to-br from-brand-100 to-brand-200 rounded-2xl flex items-center justify-center mb-8 mx-auto">
+            <div className="mx-auto mb-8 flex h-16 w-16 items-center justify-center rounded-full border border-brand-100 bg-brand-50">
               <svg width="28" height="28" viewBox="0 0 22 22" fill="none">
-                <circle cx="11" cy="8" r="4" stroke="#0171be" strokeWidth="1.8" />
-                <path d="M3 19c0-4 3.582-7 8-7s8 3 8 7" stroke="#0171be" strokeWidth="1.8" strokeLinecap="round" />
+                <circle cx="11" cy="8" r="4" stroke="#1d7f72" strokeWidth="1.8" />
+                <path d="M3 19c0-4 3.582-7 8-7s8 3 8 7" stroke="#1d7f72" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             </div>
 
@@ -66,7 +65,7 @@ export default function DoctorLogin() {
                   onChange={e => setForm({ ...form, email: e.target.value })}
                   placeholder="doctor@clinic.com"
                   required
-                  className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-400 transition hover:border-gray-300"
+                  className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm transition hover:border-brand-200 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100"
                 />
               </div>
 
@@ -79,7 +78,7 @@ export default function DoctorLogin() {
                     onChange={e => setForm({ ...form, password: e.target.value })}
                     placeholder="••••••••"
                     required
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-400 transition hover:border-gray-300"
+                    className="w-full rounded-2xl border border-gray-200 px-4 py-3 pr-11 text-sm transition hover:border-brand-200 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100"
                   />
                   <button type="button" onClick={() => setShow(!show)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition">
@@ -110,7 +109,7 @@ export default function DoctorLogin() {
               )}
 
               <button type="submit" disabled={loading}
-                className="w-full bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white font-semibold py-3 rounded-xl text-sm transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-brand-600/20">
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-600 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60">
                 {loading ? (
                   <>
                     <svg className="animate-spin w-5 h-5" viewBox="0 0 16 16" fill="none">
@@ -125,7 +124,7 @@ export default function DoctorLogin() {
 
             <div className="mt-6 pt-6 border-t border-gray-100">
               <p className="text-xs text-gray-500 text-center">
-                💡 <span className="font-medium text-gray-600">Secure login</span> - Your data is encrypted
+                <span className="font-medium text-gray-600">Secure login</span> - Your data is encrypted
               </p>
             </div>
           </div>

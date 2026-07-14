@@ -6,10 +6,19 @@ export default function AdminDoctors() {
   const [doctors, setDoctors] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState({ fullName: '', email: '', specialization: '', qualification: '', password: '' })
+  const [form, setForm] = useState({ fullName: '', email: '', specialization: '', qualification: '', consultationFee: '' })
+
+  // Set/edit consultation fee for an existing doctor
+  const [feeModal, setFeeModal] = useState(null) // doctor | null
+  const [feeValue, setFeeValue] = useState('')
+  const [feeSaving, setFeeSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  // Shown ONCE after creating a doctor — { fullName, email, tempPassword, loginUrl }
+  const [credentials, setCredentials] = useState(null)
+  const [copiedField, setCopiedField] = useState('')
 
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [scheduleDoctor, setScheduleDoctor] = useState(null)
@@ -18,7 +27,7 @@ export default function AdminDoctors() {
 
   const fetchDoctors = () => {
     setLoading(true)
-    adminApi.get('/doctors')
+    adminApi.get('/admin/doctors')
       .then(res => setDoctors(res.data.data || res.data))
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -31,9 +40,18 @@ export default function AdminDoctors() {
     setError('')
     setSubmitting(true)
     try {
-      await adminApi.post('/doctors/create', form)
+      const res = await adminApi.post('/admin/doctors', form)
+      const created = res.data.data
       setSuccess(`${form.fullName} added. Credentials sent to ${form.email}.`)
-      setForm({ fullName: '', email: '', specialization: '', qualification: '', password: '' })
+      if (created?.temp_password) {
+        setCredentials({
+          fullName: created.fullName,
+          email: created.email,
+          tempPassword: created.temp_password,
+          loginUrl: created.login_url,
+        })
+      }
+      setForm({ fullName: '', email: '', specialization: '', qualification: '', consultationFee: '' })
       setShowModal(false)
       fetchDoctors()
       setTimeout(() => setSuccess(''), 4000)
@@ -41,6 +59,27 @@ export default function AdminDoctors() {
       setError(err.response?.data?.message || 'Failed to create doctor.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleSaveFee = async () => {
+    setFeeSaving(true)
+    setError('')
+    try {
+      const doctorId = feeModal.id || feeModal._id
+      await adminApi.patch(`/admin/doctors/${doctorId}`, {
+        consultationFee: feeValue === '' ? null : feeValue,
+      })
+      setSuccess(feeValue === ''
+        ? `Fee hidden for ${feeModal.full_name || feeModal.fullName}.`
+        : `Fee updated for ${feeModal.full_name || feeModal.fullName}.`)
+      setFeeModal(null)
+      fetchDoctors()
+      setTimeout(() => setSuccess(''), 4000)
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update fee.')
+    } finally {
+      setFeeSaving(false)
     }
   }
 
@@ -149,10 +188,15 @@ export default function AdminDoctors() {
                   </span>
                 </div>
 
-                <h3 className="font-semibold text-gray-900">{doctor.fullName}</h3>
+                <h3 className="font-semibold text-gray-900">{doctor.fullName || doctor.full_name}</h3>
                 <p className="text-brand-600 text-xs font-medium mt-0.5">{doctor.specialization}</p>
                 <p className="text-gray-400 text-xs mt-0.5">{doctor.qualification}</p>
                 <p className="text-gray-400 text-xs mt-0.5">{doctor.email}</p>
+                <p className="text-xs mt-1.5 font-semibold text-gray-700">
+                  {doctor.consultation_fee != null
+                    ? `₹${Number(doctor.consultation_fee).toLocaleString('en-IN')} consultation`
+                    : <span className="font-normal text-gray-300">Fee not shown to patients</span>}
+                </p>
 
                 <div className="mt-4 pt-3 border-t border-gray-100 flex gap-2">
                   <button
@@ -160,6 +204,12 @@ export default function AdminDoctors() {
                     className="flex-1 py-2 rounded-xl text-xs font-medium transition border border-gray-200 text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-1.5"
                   >
                     ⏱ Set Schedule
+                  </button>
+                  <button
+                    onClick={() => { setFeeModal(doctor); setFeeValue(doctor.consultation_fee != null ? String(doctor.consultation_fee) : '') }}
+                    className="flex-1 py-2 rounded-xl text-xs font-medium transition border border-gray-200 text-gray-700 hover:bg-gray-50"
+                  >
+                    ₹ Fee
                   </button>
                   <button
                     onClick={() => handleToggle(doctor.id || doctor._id, doctor.is_active)}
@@ -192,20 +242,21 @@ export default function AdminDoctors() {
 
             <form onSubmit={handleCreate} className="space-y-3">
               {[
-                { key: 'fullName', label: 'Full name', placeholder: 'Anil Mehta', type: 'text' },
-                { key: 'email', label: 'Email', placeholder: 'doctor@clinic.com', type: 'email' },
-                { key: 'specialization', label: 'Specialization', placeholder: 'Cardiologist', type: 'text' },
+                { key: 'fullName', label: 'Full name', placeholder: 'Anil Mehta', type: 'text', required: true },
+                { key: 'email', label: 'Email', placeholder: 'doctor@clinic.com', type: 'email', required: true },
+                { key: 'specialization', label: 'Specialization', placeholder: 'Cardiologist', type: 'text', required: true },
                 { key: 'qualification', label: 'Qualification', placeholder: 'MBBS, MD (optional)', type: 'text' },
-                { key: 'password', label: 'Temp password', placeholder: 'They will change this', type: 'password' },
+                { key: 'consultationFee', label: 'Consultation fee in ₹ (optional)', placeholder: 'e.g. 500 — leave empty to hide fees', type: 'number' },
               ].map(field => (
                 <div key={field.key}>
                   <label className="block text-xs font-medium text-gray-600 mb-1">{field.label}</label>
                   <input
                     type={field.type}
+                    min={field.type === 'number' ? 0 : undefined}
                     value={form[field.key]}
                     onChange={e => setForm({ ...form, [field.key]: e.target.value })}
                     placeholder={field.placeholder}
-                    required={field.key !== 'qualification'}
+                    required={!!field.required}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent"
                   />
                 </div>
@@ -237,6 +288,93 @@ export default function AdminDoctors() {
           </div>
         </div>
       )}
+      {/* Set fee modal */}
+      {feeModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-fade-up">
+            <h2 className="text-lg font-display font-semibold text-gray-900 mb-1">Consultation fee</h2>
+            <p className="text-gray-500 text-xs mb-4">
+              For <strong>{feeModal.full_name || feeModal.fullName}</strong>. Shown to patients when set —
+              leave empty to hide fees for this doctor.
+            </p>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-gray-500 font-semibold">₹</span>
+              <input
+                type="number"
+                min="0"
+                autoFocus
+                value={feeValue}
+                onChange={e => setFeeValue(e.target.value)}
+                placeholder="500"
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setFeeModal(null)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition">
+                Cancel
+              </button>
+              <button type="button" onClick={handleSaveFee} disabled={feeSaving}
+                className="flex-1 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium transition disabled:opacity-60">
+                {feeSaving ? 'Saving...' : feeValue === '' ? 'Hide fee' : 'Save fee'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* One-time credentials modal — temp password is not retrievable later */}
+      {credentials && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-fade-up">
+            <div className="mb-4">
+              <h2 className="text-lg font-display font-semibold text-gray-900">Doctor credentials</h2>
+              <p className="text-gray-500 text-xs mt-0.5">
+                For <strong>{credentials.fullName}</strong> — also emailed to {credentials.email}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { key: 'loginUrl', label: 'Login URL (their clinic portal)', value: credentials.loginUrl },
+                { key: 'email', label: 'Email', value: credentials.email },
+                { key: 'tempPassword', label: 'Temporary password', value: credentials.tempPassword, mono: true },
+              ].map(f => (
+                <div key={f.key}>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
+                  <div className="flex items-center gap-2">
+                    <code className={`flex-1 truncate bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm ${f.mono ? 'font-semibold tracking-widest' : ''}`}>
+                      {f.value}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(f.value)
+                        setCopiedField(f.key)
+                        setTimeout(() => setCopiedField(''), 1500)
+                      }}
+                      className="px-3 py-2.5 rounded-xl text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition whitespace-nowrap">
+                      {copiedField === f.key ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-700">
+              ⚠️ This password is shown only once. The doctor will be asked to change it on first login.
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCredentials(null)}
+              className="mt-4 w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium transition">
+              Done — I've saved these
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Schedule Modal */}
       {showScheduleModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">

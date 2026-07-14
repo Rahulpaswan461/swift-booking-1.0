@@ -1,9 +1,28 @@
 import supabase from "../config/supabase.js"
-import { sendBookingConfirmationEmail, sendRescheduleConfirmationEmail } from "../services/emailService.js"
+import { sendBookingConfirmationEmail, sendRescheduleConfirmationEmail, sendCancellationEmail } from "../services/emailService.js"
+import { logAppointmentEvent } from "../utils/appointmentEvents.js"
+import { sendBookingConfirmationSms } from "../services/smsService.js"
 import crypto from "crypto"
 
 export const bookAppointment = async (req, res) => {
     try {
+        const clinicId = req.tenant?.id
+        const patient_id = req.patient?.patient_id
+
+        if (!clinicId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Clinic context is required. Access through your clinic subdomain.'
+            })
+        }
+
+        if (!patient_id) {
+            return res.status(401).json({
+                success: false,
+                message: 'You must verify your identity first.'
+            })
+        }
+
         const { fullName, phone, date_of_birth, doctor_id, appointment_date, appointment_time, notes } = req.body;
 
         if (!fullName || !phone || !doctor_id || !appointment_date || !appointment_time) {
@@ -13,42 +32,31 @@ export const bookAppointment = async (req, res) => {
             })
         }
 
-        const email = req.body.email || localStorage?.getItem?.('otp_email')
-        if (!email) {
-            return res.status(400).json({
+        // Verify the doctor belongs to this clinic
+        const { data: doctorCheck } = await supabase
+            .from('doctors')
+            .select('id, clinic_id')
+            .eq('id', doctor_id)
+            .single()
+
+        if (!doctorCheck || doctorCheck.clinic_id !== clinicId) {
+            return res.status(403).json({
                 success: false,
-                message: 'Email is required'
+                message: 'This doctor does not belong to the selected clinic'
             })
         }
 
-        // Get or create patient
-        const { data: existingPatient } = await supabase
-            .from('patients')
-            .select('id')
-            .eq('email', email)
-            .single()
+        // Update patient info (name, phone) if provided
+        if (fullName || phone) {
+            const updateData = {}
+            if (fullName) updateData.name = fullName
+            if (phone) updateData.phone = phone
+            if (date_of_birth) updateData.date_of_birth = date_of_birth
 
-        let patient_id = existingPatient?.id
-
-        if (!patient_id) {
-            const { data: newPatient, error: patientError } = await supabase
+            await supabase
                 .from('patients')
-                .insert({
-                    email,
-                    full_name: fullName,
-                    phone,
-                    date_of_birth,
-                })
-                .select('id')
-                .single()
-
-            if (patientError) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Failed to create patient record'
-                })
-            }
-            patient_id = newPatient.id
+                .update(updateData)
+                .eq('id', patient_id)
         }
 
         // Check if slot is already booked
@@ -71,10 +79,11 @@ export const bookAppointment = async (req, res) => {
         // Generate cancel token
         const cancel_token = crypto.randomBytes(32).toString('hex')
 
-        // Create appointment
+        // Create appointment — clinic_id derived from tenant, never from request body
         const { data: appointment, error: appointmentError } = await supabase
             .from('appointments')
             .insert({
+                clinic_id: clinicId,
                 patient_id,
                 doctor_id,
                 appointment_date,
@@ -106,12 +115,28 @@ export const bookAppointment = async (req, res) => {
             .eq('id', patient_id)
             .single()
 
-        // Send confirmation email
-        await sendBookingConfirmationEmail({
-            appointment,
-            patient,
-            doctor
-        }).catch(err => console.error("Email failed:", err.message))
+        logAppointmentEvent(appointment.id, clinicId, "booked", {
+            date: appointment_date,
+            time: appointment_time,
+        })
+
+        // Send confirmation in the background via the channel the patient
+        // verified with — email → email, phone → SMS (both when possible)
+        if (patient?.email) {
+            sendBookingConfirmationEmail({
+                appointment,
+                patient,
+                doctor,
+                clinic: req.tenant
+            }).catch(err => console.error("Email failed:", err.message))
+        }
+        if (req.patient?.contact_type === 'phone' && (patient?.phone || phone)) {
+            sendBookingConfirmationSms({
+                appointment: { ...appointment, patient_phone: patient?.phone || phone },
+                doctor,
+                clinic: req.tenant
+            }).catch(err => console.error("SMS failed:", err.message))
+        }
 
         return res.status(201).json({
             success: true,
@@ -130,12 +155,13 @@ export const bookAppointment = async (req, res) => {
 export const getAppointment = async (req, res) => {
     try {
         const { id } = req.params
+        const clinicId = req.tenant?.id
 
         const { data: appointment, error } = await supabase
             .from('appointments')
             .select(`
                 *,
-                patient:patients(id, full_name, email, phone),
+                patient:patients(id, name, email, phone),
                 doctor:doctors(id, full_name, specialization)
             `)
             .eq('id', id)
@@ -145,6 +171,14 @@ export const getAppointment = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: 'Appointment not found'
+            })
+        }
+
+        // Tenant isolation: appointment must belong to the resolved clinic
+        if (clinicId && appointment.clinic_id !== clinicId) {
+            return res.status(403).json({
+                success: false,
+                message: 'This appointment does not belong to your clinic'
             })
         }
 
@@ -165,10 +199,11 @@ export const cancelAppointment = async (req, res) => {
     try {
         const { id } = req.params
         const { cancel_token } = req.body
+        const clinicId = req.tenant?.id
 
         const { data: appointment, error: fetchError } = await supabase
             .from('appointments')
-            .select('*')
+            .select('*, patient:patients(*), doctor:doctors(*)')
             .eq('id', id)
             .single()
 
@@ -176,6 +211,14 @@ export const cancelAppointment = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: 'Appointment not found'
+            })
+        }
+
+        // Tenant isolation: appointment must belong to the resolved clinic
+        if (clinicId && appointment.clinic_id !== clinicId) {
+            return res.status(403).json({
+                success: false,
+                message: 'This appointment does not belong to your clinic'
             })
         }
 
@@ -199,6 +242,21 @@ export const cancelAppointment = async (req, res) => {
             })
         }
 
+        logAppointmentEvent(appointment.id, appointment.clinic_id, "cancelled", {
+            date: appointment.appointment_date,
+            time: appointment.appointment_time,
+        })
+
+        // Confirmation email in the background
+        if (appointment.patient?.email) {
+            sendCancellationEmail({
+                appointment,
+                patient: appointment.patient,
+                doctor: appointment.doctor,
+                clinic: req.tenant
+            }).catch(err => console.error("Cancellation email failed:", err.message))
+        }
+
         return res.status(200).json({
             success: true,
             message: 'Appointment cancelled successfully'
@@ -215,10 +273,11 @@ export const cancelAppointment = async (req, res) => {
 export const cancelAppointmentWithToken = async (req, res) => {
     try {
         const { id, token } = req.params
+        const clinicId = req.tenant?.id
 
         const { data: appointment, error: fetchError } = await supabase
             .from('appointments')
-            .select('*')
+            .select('*, patient:patients(*), doctor:doctors(*)')
             .eq('id', id)
             .single()
 
@@ -226,6 +285,14 @@ export const cancelAppointmentWithToken = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: 'Appointment not found'
+            })
+        }
+
+        // Tenant isolation: appointment must belong to the resolved clinic
+        if (clinicId && appointment.clinic_id !== clinicId) {
+            return res.status(403).json({
+                success: false,
+                message: 'This appointment does not belong to your clinic'
             })
         }
 
@@ -247,6 +314,21 @@ export const cancelAppointmentWithToken = async (req, res) => {
                 success: false,
                 message: 'Failed to cancel appointment'
             })
+        }
+
+        logAppointmentEvent(appointment.id, appointment.clinic_id, "cancelled", {
+            date: appointment.appointment_date,
+            time: appointment.appointment_time,
+        })
+
+        // Confirmation email in the background
+        if (appointment.patient?.email) {
+            sendCancellationEmail({
+                appointment,
+                patient: appointment.patient,
+                doctor: appointment.doctor,
+                clinic: req.tenant
+            }).catch(err => console.error("Cancellation email failed:", err.message))
         }
 
         return res.status(200).json({
@@ -351,12 +433,20 @@ export const rescheduleAppointment = async (req, res) => {
             })
         }
 
-        // Send reschedule confirmation email
-        await sendRescheduleConfirmationEmail({
+        logAppointmentEvent(appointment.id, appointment.clinic_id, "rescheduled", {
+            from_date: appointment.appointment_date,
+            from_time: appointment.appointment_time,
+            to_date: appointment_date,
+            to_time: appointment_time,
+        })
+
+        // Send reschedule confirmation in the background
+        sendRescheduleConfirmationEmail({
             appointment: { ...appointment, appointment_date, appointment_time },
             oldTime,
             patient: appointment.patient,
-            doctor: appointment.doctor
+            doctor: appointment.doctor,
+            clinic: req.tenant
         }).catch(err => console.error("Email failed:", err.message))
 
         return res.status(200).json({

@@ -3,16 +3,47 @@
 @tailwind utilities;
 
 @layer base {
+  /* Brand palette as RGB triplets so each clinic's primary color can
+     re-theme the whole patient portal at runtime (see utils/theme.js).
+     Defaults = the MediBook teal. */
+  :root {
+    --brand-50: 238 250 247;
+    --brand-100: 215 242 236;
+    --brand-200: 175 227 216;
+    --brand-300: 124 207 192;
+    --brand-400: 68 180 161;
+    --brand-500: 36 150 132;
+    --brand-600: 29 127 114;
+    --brand-700: 25 102 93;
+    --brand-800: 24 82 75;
+    --brand-900: 21 63 59;
+  }
+
   * { box-sizing: border-box; }
   body {
     font-family: 'DM Sans', sans-serif;
-    background: #f8fafc;
-    color: #0f172a;
+    background: #f8fbfa;
+    color: #111827;
     -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: #afe3d8;
+    color: #153f3b;
   }
 }
 
 @layer utilities {
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.84);
+    box-shadow: 0 24px 70px rgba(17, 24, 39, 0.10);
+    backdrop-filter: blur(18px);
+  }
+
+  .trust-ring {
+    box-shadow: 0 0 0 1px rgba(29, 127, 114, 0.10), 0 18px 45px rgba(29, 127, 114, 0.18);
+  }
+
   .delay-100 { animation-delay: 100ms; }
   .delay-200 { animation-delay: 200ms; }
   .delay-300 { animation-delay: 300ms; }

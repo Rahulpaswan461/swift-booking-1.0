@@ -1,6 +1,8 @@
 import supabase from "../config/supabase.js"
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
+import { buildClinicUrl } from "../utils/clinicUrl.js"
+import { EARLY_ACCESS } from "../middleware/tenant.js"
 
 export const adminlogin = async (req, res) => {
     try {
@@ -34,8 +36,15 @@ export const adminlogin = async (req, res) => {
             })
         }
 
+        // Fetch clinic info
+        const { data: clinic } = await supabase
+            .from('clinics')
+            .select('id, name, slug, trial_ends_at')
+            .eq('id', admin.clinic_id)
+            .single()
+
         const token = jwt.sign(
-            { id: admin.id, role: 'admin', email: admin.email },
+            { id: admin.id, role: 'admin', email: admin.email, clinic_id: admin.clinic_id },
             process.env.JWT_SECRET,
             { expiresIn: '12h' }
         )
@@ -46,7 +55,13 @@ export const adminlogin = async (req, res) => {
             admin: {
                 id: admin.id,
                 fullName: admin.full_name,
-                email: admin.email
+                email: admin.email,
+                clinic_id: admin.clinic_id,
+                clinicName: clinic?.name,
+                clinicSlug: clinic?.slug,
+                clinicUrl: clinic?.slug ? buildClinicUrl(clinic.slug) : null,
+                trialEndsAt: clinic?.trial_ends_at,
+                earlyAccess: EARLY_ACCESS
             }
         })
 
@@ -59,16 +74,18 @@ export const adminlogin = async (req, res) => {
 
 export const getAllAppointments = async (req, res) => {
     try {
+        const clinicId = req.admin.clinic_id
         const { date, doctor, status } = req.query
 
-        // Build query filters
+        // Build query filters — always scoped to admin's clinic
         let query = supabase
             .from('appointments')
             .select(`
                 *,
-                patients (full_name, email, phone),
+                patients (name, email, phone),
                 doctors  (full_name, specialization)
             `)
+            .eq('clinic_id', clinicId)
 
         if (date) {
             query = query.eq('appointment_date', date)
@@ -101,7 +118,7 @@ export const getAllAppointments = async (req, res) => {
             data: appointments.map(a => ({
                 id: a.id,
                 patient: {
-                    name: a.patients?.full_name,
+                    name: a.patients?.name,
                     email: a.patients?.email,
                     phone: a.patients?.phone,
                 },
@@ -126,6 +143,7 @@ export const getAllAppointments = async (req, res) => {
 
 export const getStats = async (req, res) => {
     try {
+        const clinicId = req.admin.clinic_id
         const today = new Date().toISOString().split('T')[0]
 
         // Get start of current week (Monday)
@@ -135,7 +153,8 @@ export const getStats = async (req, res) => {
         monday.setDate(now.getDate() - dayOfWeek + 1)
         const weekStart = monday.toISOString().split('T')[0]
 
-        // Fetch all data in parallel
+        // Fetch all data in ONE parallel batch, selecting only needed
+        // columns — this endpoint drives the dashboard and must be fast.
         const [
             { data: todayAppointments },
             { data: weekAppointments },
@@ -143,50 +162,46 @@ export const getStats = async (req, res) => {
             { count: totalDoctorsCount },
             { data: patientIds }
         ] = await Promise.all([
-            // Today
+            // Today — includes the doctor join so the per-doctor breakdown
+            // needs no second query
             supabase
                 .from('appointments')
-                .select('*')
+                .select('status, doctor_id, doctors (full_name, specialization)')
+                .eq('clinic_id', clinicId)
                 .eq('appointment_date', today),
 
-            // This week
+            // This week — status only
             supabase
                 .from('appointments')
-                .select('*')
+                .select('status')
+                .eq('clinic_id', clinicId)
                 .gte('appointment_date', weekStart),
 
             // All time count
             supabase
                 .from('appointments')
-                .select('*', { count: 'exact', head: true }),
+                .select('*', { count: 'exact', head: true })
+                .eq('clinic_id', clinicId),
 
-            // Active doctors count
+            // Active doctors count (this clinic only)
             supabase
                 .from('doctors')
                 .select('*', { count: 'exact', head: true })
+                .eq('clinic_id', clinicId)
                 .eq('is_active', true),
 
-            // Unique patients (distinct)
+            // Unique patients (this clinic only)
             supabase
                 .from('appointments')
                 .select('patient_id')
+                .eq('clinic_id', clinicId)
         ])
 
         const uniquePatients = new Set(patientIds?.map(r => r.patient_id) || [])
 
-        // Get doctor breakdown for today with joins
-        const { data: doctorBreakdownData } = await supabase
-            .from('appointments')
-            .select(`
-                doctor_id,
-                status,
-                doctors (full_name, specialization)
-            `)
-            .eq('appointment_date', today)
-
-        // Process doctor breakdown
+        // Per-doctor breakdown from the already-fetched today rows
         const doctorBreakdownMap = {}
-        doctorBreakdownData?.forEach(appt => {
+        todayAppointments?.forEach(appt => {
             if (!doctorBreakdownMap[appt.doctor_id]) {
                 doctorBreakdownMap[appt.doctor_id] = {
                     doctorName: appt.doctors?.full_name,
@@ -237,12 +252,13 @@ export const getStats = async (req, res) => {
 
 export const toggleDoctor = async (req, res) => {
     try {
+        const clinicId = req.admin.clinic_id
         const { id } = req.params
 
-        // Get current doctor
+        // Get current doctor — must belong to admin's clinic
         const { data: doctor, error: fetchError } = await supabase
             .from('doctors')
-            .select('is_active')
+            .select('is_active, clinic_id')
             .eq('id', id)
             .single()
 
@@ -250,11 +266,16 @@ export const toggleDoctor = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Doctor not found' })
         }
 
+        if (doctor.clinic_id !== clinicId) {
+            return res.status(403).json({ success: false, message: 'Doctor does not belong to your clinic' })
+        }
+
         // Toggle and update
         const { data: updated, error: updateError } = await supabase
             .from('doctors')
             .update({ is_active: !doctor.is_active })
             .eq('id', id)
+            .eq('clinic_id', clinicId)
             .select()
             .single()
 

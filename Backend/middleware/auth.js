@@ -39,6 +39,11 @@ export const protectDoctor = (req, res, next) => {
             return res.status(403).json({ success: false, message: "Access denied . " })
         }
 
+        // clinic_id must be present in the JWT
+        if (!decoded.clinic_id) {
+            return res.status(403).json({ success: false, message: "Invalid session — missing clinic context. Please log in again." })
+        }
+
         req.doctor = decoded;
 
         next();
@@ -52,7 +57,7 @@ export const protectAdmin = (req, res, next) => {
     try {
         const authHeader = req.headers.authorization
 
-        if (req.path === '/api/admin/login') return next()
+        if (req.path === '/api/admin/login' || req.path.startsWith('/api/admin/clinics')) return next()
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return res.status(401).json({ success: false, message: 'No token provided. ' })
@@ -64,6 +69,12 @@ export const protectAdmin = (req, res, next) => {
         if (decoded.role !== 'admin') {
             return res.status(403).json({ success: false, message: "Access denied . " })
         }
+
+        // clinic_id must be present in the JWT
+        if (!decoded.clinic_id) {
+            return res.status(403).json({ success: false, message: "Invalid session — missing clinic context. Please log in again." })
+        }
+
         req.admin = decoded;
 
         next();

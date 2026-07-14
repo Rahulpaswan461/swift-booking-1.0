@@ -1,78 +1,10 @@
 import supabase from "../config/supabase.js"
 import jwt from "jsonwebtoken"
-import { sendWelcomeEmail } from "../services/emailService.js"
-import { generateTempPassword } from "../utils/otpUtils.js"
 import bcrypt from 'bcrypt'
+import { logAppointmentEvent } from "../utils/appointmentEvents.js"
 
-export const createDoctor = async (req, res) => {
-    try {
-        const { fullName, email, specialization, qualification } = req.body;
-
-        if (!fullName || !email || !specialization) {
-            return res.status(400).json({
-                success: false,
-                message: 'Fullname, email and specialization are required.'
-            })
-        }
-
-        // Check if doctor already exists
-        const { data: existing, error: checkError } = await supabase
-            .from('doctors')
-            .select('id')
-            .eq('email', email)
-            .single()
-
-        if (existing) {
-            return res.status(409).json({
-                success: false,
-                message: 'A doctor with this email already exists.'
-            })
-        }
-
-        const tempPassword = generateTempPassword()
-        const hashedPassword = await bcrypt.hash(tempPassword, 12)
-
-        const { data: doctor, error: createError } = await supabase
-            .from('doctors')
-            .insert({
-                full_name: fullName,
-                email,
-                specialization,
-                qualification,
-                password: hashedPassword,
-                first_login: true,
-                is_active: true
-            })
-            .select('id, full_name, email, specialization, qualification, is_active')
-            .single()
-
-        if (createError || !doctor) {
-            console.error("Error creating doctor:", createError)
-            return res.status(400).json({ success: false, message: 'Failed to create doctor.' })
-        }
-
-        await sendWelcomeEmail({ doctor: { fullName, email }, tempPassword }).catch(err =>
-            console.error("Welcome email failed: ", err.message)
-        )
-
-        return res.status(201).json({
-            success: true,
-            message: 'Doctor account created. Credentials have been sent to email.',
-            data: {
-                id: doctor.id,
-                fullName: doctor.full_name,
-                email: doctor.email,
-                specialization: doctor.specialization,
-                qualification: doctor.qualification,
-                is_active: doctor.is_active,
-            }
-        })
-    }
-    catch (error) {
-        console.log("Error while creating doctor", error.stack)
-        return res.status(500).json({ success: false, message: "Internal Server Error !" })
-    }
-}
+// NOTE: createDoctor was removed — it lacked clinic_id support.
+// Use doctorManagement.createDoctorForClinic instead.
 
 export const doctorLogin = async (req, res) => {
     try {
@@ -87,8 +19,6 @@ export const doctorLogin = async (req, res) => {
             .select('*')
             .eq('email', email)
             .single()
-
-        console.log("doctor response for the first login: ", doctor)
 
         if (error || !doctor) {
             return res.status(401).json({ success: false, message: "Invalid email or password" })
@@ -105,7 +35,7 @@ export const doctorLogin = async (req, res) => {
         }
 
         const token = jwt.sign(
-            { id: doctor.id, role: 'doctor', email: doctor.email },
+            { id: doctor.id, role: 'doctor', email: doctor.email, clinic_id: doctor.clinic_id },
             process.env.JWT_SECRET,
             { expiresIn: '8h' }
         )
@@ -119,7 +49,8 @@ export const doctorLogin = async (req, res) => {
                 fullName: doctor.full_name,
                 email: doctor.email,
                 specialization: doctor.specialization,
-                qualification: doctor.qualification
+                qualification: doctor.qualification,
+                clinic_id: doctor.clinic_id
             }
         })
     }
@@ -133,8 +64,6 @@ export const changePassword = async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body
         const doctorId = req.doctor.id
-
-        console.log("request doctor: ", req.doctor)
 
         // 1. Validate inputs
         if (!currentPassword || !newPassword) {
@@ -170,11 +99,8 @@ export const changePassword = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Doctor not found.' })
         }
 
-        console.log("doctor response: ", doctor)
-
         // 4. Verify current password is correct
         const isMatch = await bcrypt.compare(currentPassword, doctor.password)
-        console.log("isMatch: ", isMatch)
         if (!isMatch) {
             return res.status(400).json({
                 success: false,
@@ -206,8 +132,6 @@ export const changePassword = async (req, res) => {
 
         if (updateError) throw updateError
 
-        console.log("updated doctor: ", updatedDoctor)
-        console.log("executed the code: ")
         return res.status(200).json({
             success: true,
             message: 'Password changed successfully. You can now access your dashboard.',
@@ -221,7 +145,6 @@ export const changePassword = async (req, res) => {
 
 export const getDoctor = async (req, res) => {
     try {
-        console.log("route called ")
         const { email } = req.query;
 
         const { data: doctor, error } = await supabase
@@ -244,13 +167,43 @@ export const getDoctor = async (req, res) => {
 
 export const getAllDoctors = async (req, res) => {
     try {
+        // Patient-facing route — must be accessed via a clinic subdomain
+        const clinicId = req.tenant?.id
+
+        if (!clinicId) {
+            return res.status(400).json({
+                success: false,
+                message: "Clinic context is required. Access through your clinic subdomain."
+            })
+        }
+
+        // select("*") + whitelist: optional columns (consultation_fee) work
+        // with or without migration 008; the join pulls each doctor's REAL
+        // weekly schedule so the UI can show honest availability.
         const { data: doctors, error } = await supabase
             .from('doctors')
-            .select('id, full_name, email, specialization, qualification, is_active, created_at')
+            .select('*, doctor_schedules(working_days, start_time, end_time)')
+            .eq('clinic_id', clinicId)
+            .eq('is_active', true)
 
         if (error) throw error
 
-        return res.status(200).json({ message: "All doctors fetched", data: doctors })
+        const data = (doctors || []).map(d => {
+            const schedule = Array.isArray(d.doctor_schedules) ? d.doctor_schedules[0] : d.doctor_schedules
+            return {
+                id: d.id,
+                full_name: d.full_name,
+                specialization: d.specialization,
+                qualification: d.qualification,
+                consultation_fee: d.consultation_fee ?? null,
+                is_active: d.is_active,
+                created_at: d.created_at,
+                working_days: schedule?.working_days || null,
+                consult_hours: schedule ? { start: schedule.start_time, end: schedule.end_time } : null,
+            }
+        })
+
+        return res.status(200).json({ message: "All doctors fetched", data })
     }
     catch (error) {
         console.error("Error while fetching doctors", error)
@@ -260,16 +213,18 @@ export const getAllDoctors = async (req, res) => {
 
 export const getDoctorAppointments = async (req, res) => {
     try {
-        console.log("function called: ", req.doctor)
         const doctorId = req.doctor.id
 
-        const date = req.query.date || new Date().toISOString().split('T')[0]
+        // Default to the server's local date (frontend normally sends one)
+        const now = new Date()
+        const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+        const date = req.query.date || localToday
 
         const { data: appointments, error } = await supabase
             .from('appointments')
             .select(`
                 *,
-                patients (full_name, email, phone)
+                patients (name, email, phone)
             `)
             .eq('doctor_id', doctorId)
             .eq('appointment_date', date)
@@ -295,7 +250,7 @@ export const getDoctorAppointments = async (req, res) => {
                 data: appointments.map(a => ({
                     id: a.id,
                     patient: {
-                        name: a.patients?.full_name,
+                        name: a.patients?.name,
                         email: a.patients?.email,
                         phone: a.patients?.phone,
                     },
@@ -310,6 +265,92 @@ export const getDoctorAppointments = async (req, res) => {
     catch (error) {
         console.error("Error while getting the doctor appointments: ", error.stack)
         return res.status(500).json({ success: false, message: "Something went wrong" })
+    }
+}
+
+/**
+ * Doctor's patient roster — every patient who has booked with this doctor
+ * at this clinic, with total sessions, last visit, and last session notes.
+ * Scoped to the doctor's own id + clinic_id from the JWT.
+ */
+export const getDoctorPatients = async (req, res) => {
+    try {
+        const doctorId = req.doctor.id
+        const clinicId = req.doctor.clinic_id
+
+        const { data: appointments, error } = await supabase
+            .from('appointments')
+            .select(`
+                id, patient_id, appointment_date, appointment_time, status, notes,
+                patients (id, name, email, phone),
+                session_notes (notes, diagnosis, prescription, follow_up_date, updated_at)
+            `)
+            .eq('doctor_id', doctorId)
+            .eq('clinic_id', clinicId)
+            .order('appointment_date', { ascending: false })
+            .order('appointment_time', { ascending: false })
+
+        if (error) throw error
+
+        // Aggregate appointments per patient (already sorted latest-first)
+        const byPatient = new Map()
+        for (const appt of appointments || []) {
+            if (!appt.patients) continue
+            let entry = byPatient.get(appt.patient_id)
+            if (!entry) {
+                const sessionNote = Array.isArray(appt.session_notes) ? appt.session_notes[0] : appt.session_notes
+                entry = {
+                    patient: {
+                        id: appt.patients.id,
+                        name: appt.patients.name,
+                        email: appt.patients.email,
+                        phone: appt.patients.phone,
+                    },
+                    total_appointments: 0,
+                    completed_sessions: 0,
+                    upcoming: 0,
+                    last_visit: {
+                        date: appt.appointment_date,
+                        time: appt.appointment_time,
+                        status: appt.status,
+                    },
+                    last_notes: sessionNote
+                        ? {
+                            notes: sessionNote.notes,
+                            diagnosis: sessionNote.diagnosis,
+                            prescription: sessionNote.prescription,
+                            follow_up_date: sessionNote.follow_up_date,
+                        }
+                        : null,
+                }
+                byPatient.set(appt.patient_id, entry)
+            }
+            entry.total_appointments += 1
+            if (appt.status === 'completed') entry.completed_sessions += 1
+            if (appt.status === 'confirmed') entry.upcoming += 1
+            // Latest appointment may have no notes yet — fall back to the
+            // most recent one that does
+            if (!entry.last_notes) {
+                const sessionNote = Array.isArray(appt.session_notes) ? appt.session_notes[0] : appt.session_notes
+                if (sessionNote) {
+                    entry.last_notes = {
+                        notes: sessionNote.notes,
+                        diagnosis: sessionNote.diagnosis,
+                        prescription: sessionNote.prescription,
+                        follow_up_date: sessionNote.follow_up_date,
+                    }
+                }
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            data: [...byPatient.values()],
+        })
+    }
+    catch (error) {
+        console.error("getDoctorPatients error:", error.stack)
+        return res.status(500).json({ success: false, message: "Internal Server Error" })
     }
 }
 
@@ -368,6 +409,10 @@ export const updateAppointmentStatus = async (req, res) => {
             .single()
 
         if (updateError) throw updateError
+
+        logAppointmentEvent(updated.id, appointment.clinic_id, status, {
+            by: 'doctor',
+        })
 
         return res.status(200).json({
             success: true,

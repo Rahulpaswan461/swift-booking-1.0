@@ -6,7 +6,6 @@ function formatTime(t) {
   if (!t) return ''
   const [h, m] = t.split(':').map(Number)
   const res = `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
-  console.log("result is:  ", res)
   return res;
 }
 
@@ -34,9 +33,9 @@ export default function BookingConfirmation() {
   if (!appointment) return null
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 flex flex-col">
-      <header className="px-6 sm:px-8 py-6 flex items-center justify-between border-b border-gray-100 bg-white/80 backdrop-blur-sm">
-        <Logo />
+    <div className="flex min-h-screen flex-col bg-surface-50">
+      <header className="flex items-center justify-between border-b border-white/70 bg-white/80 px-6 py-5 backdrop-blur-xl sm:px-8">
+        <Logo showClinicName />
         <button 
           onClick={() => navigate('/')}
           className="text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg px-4 py-2 transition hover:bg-gray-50 flex items-center gap-2 font-medium"
@@ -81,7 +80,7 @@ export default function BookingConfirmation() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 sm:p-10 animate-fade-up text-center mb-6">
+          <div className="mb-6 rounded-[28px] border border-surface-100 bg-white p-8 text-center shadow-xl shadow-gray-900/5 animate-fade-up sm:p-10">
             <h1 className="text-4xl font-display font-bold text-gray-900 mb-3">
               Appointment confirmed!
             </h1>
@@ -90,30 +89,30 @@ export default function BookingConfirmation() {
             </p>
 
             {/* Appointment Details Card */}
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 text-left space-y-4 mb-8 border border-green-100">
+            <div className="mb-8 space-y-4 rounded-[24px] border border-emerald-100 bg-emerald-50 p-6 text-left">
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-4 border-b border-green-100">
-                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">🩺 Doctor</span>
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Doctor</span>
                   <span className="text-sm font-bold text-gray-900">Dr. {doctor?.fullName || appointment?.doctor}</span>
                 </div>
                 
                 <div className="flex items-center justify-between pb-4 border-b border-green-100">
-                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">📋 Specialty</span>
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Specialty</span>
                   <span className="text-sm text-gray-700 font-medium">{doctor?.specialization || '—'}</span>
                 </div>
                 
                 <div className="flex items-center justify-between pb-4 border-b border-green-100">
-                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">📅 Date</span>
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Date</span>
                   <span className="text-sm font-bold text-green-700">{formatDate(appointment.appointment_date)}</span>
                 </div>
                 
                 <div className="flex items-center justify-between pb-4 border-b border-green-100">
-                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">🕐 Time</span>
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Time</span>
                   <span className="text-sm font-bold text-green-700">{formatTime(appointment.appointment_time)}</span>
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">✓ Status</span>
+                  <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Status</span>
                   <span className="flex items-center gap-2 text-xs font-bold text-white bg-green-600 rounded-full px-3 py-1.5">
                     <span className="w-2 h-2 bg-white rounded-full"></span>
                     Confirmed
@@ -122,22 +121,9 @@ export default function BookingConfirmation() {
               </div>
             </div>
 
-            {/* Important Reminder */}
-            <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl px-6 py-4 mb-6">
-              <p className="text-sm text-amber-900 font-semibold mb-1">📌 Important Reminder</p>
-              <p className="text-sm text-amber-800">Please arrive <strong>10-15 minutes early</strong> to complete check-in. Bring any relevant medical documents if needed.</p>
-            </div>
-
-            {/* What to expect */}
-            <div className="bg-blue-50 border border-blue-100 rounded-2xl px-6 py-4 mb-8">
-              <p className="text-sm text-blue-900 font-semibold mb-2">💡 What to Expect</p>
-              <ul className="text-sm text-blue-800 space-y-1 text-left">
-                <li>• Arrive early for check-in</li>
-                <li>• Bring your insurance card & ID</li>
-                <li>• Prepare a list of medications</li>
-                <li>• Share any recent health concerns</li>
-              </ul>
-            </div>
+            <p className="mb-8 text-sm text-gray-500">
+              A confirmation with cancel and reschedule links has been sent to you.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -151,11 +137,11 @@ export default function BookingConfirmation() {
             </button>
             <button
               onClick={() => {
-                navigate('/')
+                navigate('/my-appointments')
               }}
               className="bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 rounded-xl text-sm transition shadow-lg shadow-brand-600/20"
             >
-              Go to home
+              My Appointments
             </button>
           </div>
         </div>

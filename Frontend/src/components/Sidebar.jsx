@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import Logo from './Logo'
+import SupportModal from './SupportModal'
 
 export function DoctorSidebar() {
   const navigate = useNavigate()
@@ -21,9 +23,9 @@ export function DoctorSidebar() {
   ]
 
   return (
-    <aside className="w-64 min-h-screen bg-white border-r border-gray-200 flex flex-col shadow-sm">
+    <aside className="flex min-h-screen w-64 flex-col border-r border-white bg-white shadow-sm">
       {/* Header */}
-      <div className="px-6 py-6 border-b border-gray-100 bg-gradient-to-r from-brand-50 to-white">
+      <div className="border-b border-surface-100 px-6 py-6">
         <Logo size="sm" />
         <p className="text-xs text-gray-500 font-semibold mt-3 uppercase tracking-wider">Doctor Portal</p>
       </div>
@@ -34,7 +36,7 @@ export function DoctorSidebar() {
           <NavLink key={link.to} to={link.to}
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all
-              ${isActive ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/30' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
+              ${isActive ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-gray-600 hover:bg-surface-100 hover:text-gray-900'}`
             }>
             {link.icon}
             {link.label}
@@ -43,9 +45,9 @@ export function DoctorSidebar() {
       </nav>
 
       {/* User Profile */}
-      <div className="px-4 py-5 border-t border-gray-100 bg-gray-50">
-        <div className="flex items-center gap-3 mb-4 bg-white p-3 rounded-xl border border-gray-100">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-bold text-sm">
+      <div className="border-t border-surface-100 bg-surface-50 px-4 py-5">
+        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-surface-100 bg-white p-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">
             {doctor.fullName?.[0] || 'D'}
           </div>
           <div className="flex-1 min-w-0">
@@ -68,6 +70,7 @@ export function DoctorSidebar() {
 export function AdminSidebar() {
   const navigate = useNavigate()
   const admin    = JSON.parse(localStorage.getItem('admin') || '{}')
+  const [showSupport, setShowSupport] = useState(false)
 
   const logout = () => {
     localStorage.removeItem('admin_token')
@@ -96,14 +99,21 @@ export function AdminSidebar() {
         <path d="M2 16c0-3.314 3.134-6 7-6s7 2.686 7 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
       </svg>
     )},
+    { to: '/admin/branding', label: 'Branding', icon: (
+      <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
+        <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M9 2c-1.5 2-2 4-2 7s.5 5 2 7c1.5-2 2-4 2-7s-.5-5-2-7z" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M2 9h14" stroke="currentColor" strokeWidth="1.5"/>
+      </svg>
+    )},
   ]
 
   return (
-    <aside className="w-64 min-h-screen bg-white border-r border-gray-200 flex flex-col shadow-sm">
+    <aside className="flex min-h-screen w-64 flex-col border-r border-white bg-white shadow-sm">
       {/* Header */}
-      <div className="px-6 py-6 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-white">
+      <div className="border-b border-surface-100 px-6 py-6">
         <Logo size="sm" />
-        <p className="text-xs text-slate-600 font-bold bg-slate-100 rounded-full px-2.5 py-1 mt-3 inline-block uppercase tracking-wider">Admin Portal</p>
+        <p className="mt-3 inline-block rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-brand-700">Admin Portal</p>
       </div>
 
       {/* Navigation */}
@@ -112,7 +122,7 @@ export function AdminSidebar() {
           <NavLink key={link.to} to={link.to}
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all
-              ${isActive ? 'bg-slate-700 text-white shadow-lg shadow-slate-700/30' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
+              ${isActive ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-gray-600 hover:bg-surface-100 hover:text-gray-900'}`
             }>
             {link.icon}
             {link.label}
@@ -120,10 +130,26 @@ export function AdminSidebar() {
         ))}
       </nav>
 
+      {/* Help & Support */}
+      <div className="px-4 pb-2">
+        <button
+          onClick={() => setShowSupport(true)}
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-gray-600 transition-all hover:bg-surface-100 hover:text-gray-900"
+        >
+          <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
+            <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M7 7a2 2 0 113.4 1.4c-.6.6-1.4.9-1.4 1.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <circle cx="9" cy="13" r="0.8" fill="currentColor"/>
+          </svg>
+          Help & Support
+        </button>
+      </div>
+      {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
+
       {/* User Profile */}
-      <div className="px-4 py-5 border-t border-gray-100 bg-gray-50">
-        <div className="flex items-center gap-3 mb-4 bg-white p-3 rounded-xl border border-gray-100">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-400 to-slate-700 flex items-center justify-center text-white font-bold text-sm">
+      <div className="border-t border-surface-100 bg-surface-50 px-4 py-5">
+        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-surface-100 bg-white p-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">
             {admin.fullName?.[0] || 'A'}
           </div>
           <div className="flex-1 min-w-0">

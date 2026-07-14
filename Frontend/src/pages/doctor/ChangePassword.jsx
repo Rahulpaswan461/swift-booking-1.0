@@ -22,7 +22,7 @@ export default function ChangePassword() {
 
     setLoading(true)
     try {
-      const res = await doctorApi.patch('/doctors/change-password', {
+      const res = await doctorApi.patch('/doctor/change-password', {
         currentPassword: form.currentPassword,
         newPassword: form.newPassword,
       })

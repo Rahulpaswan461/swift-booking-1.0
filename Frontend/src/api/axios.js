@@ -14,7 +14,7 @@ api.interceptors.response.use(res => res, err => {
   const isLoginRoute = err.config?.url?.includes('/auth/')
   if (err.response?.status === 401 && !isLoginRoute) {
     localStorage.removeItem('token')
-    localStorage.removeItem('otp_email')
+    localStorage.removeItem('otp_contact')
     window.location.href = '/'
   }
   return Promise.reject(err)
@@ -27,7 +27,7 @@ doctorApi.interceptors.request.use((config) => {
   return config
 })
 doctorApi.interceptors.response.use(res => res, err => {
-  const isLoginRoute = err.config?.url?.includes('/doctor/login')
+  const isLoginRoute = err.config?.url?.includes('/doctor/login') || err.config?.url?.includes('/doctor/change-password')
   if (err.response?.status === 401 && !isLoginRoute) {
     localStorage.removeItem('doctor_token')
     localStorage.removeItem('doctor')
@@ -43,7 +43,7 @@ adminApi.interceptors.request.use((config) => {
   return config
 })
 adminApi.interceptors.response.use(res => res, err => {
-  const isLoginRoute = err.config?.url?.includes('/admin/login')
+  const isLoginRoute = err.config?.url?.includes('/admin/login') || err.config?.url?.includes('/admin/clinics')
   if (err.response?.status === 401 && !isLoginRoute) {
     localStorage.removeItem('admin_token')
     localStorage.removeItem('admin')
