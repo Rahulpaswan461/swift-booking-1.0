@@ -40,7 +40,7 @@ function WhyCard({ text }) {
   );
 }
 
-export default function MedibookProductPage() {
+export default function HealibrateProductPage() {
   const navigate = useNavigate();
   const [showDemo, setShowDemo] = useState(false);
 
@@ -52,9 +52,9 @@ export default function MedibookProductPage() {
       {/* Hero */}
       <section className="mx-auto max-w-7xl px-5 sm:px-8 pt-16 pb-12 sm:pt-24 sm:pb-16">
         <div className="text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-4 py-2 text-sm font-semibold text-green-700">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-            Early Access — currently free for all clinics &middot; No card required
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-100 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-800">
+            <span className="w-2 h-2 rounded-full bg-brand-500 animate-pulse"></span>
+            Plans from ₹99/month &middot; Set up in minutes
           </div>
 
           <h1 className="max-w-4xl mx-auto font-display text-4xl font-semibold leading-tight text-ink-900 sm:text-5xl lg:text-6xl">
@@ -76,7 +76,7 @@ export default function MedibookProductPage() {
                 <path d="M8 2L2 7l9 5 9-5-9-5z" stroke="white" strokeWidth="1.5" strokeLinejoin="round" />
                 <path d="M2 12l9 5 9-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Start Free
+              Get Started
             </button>
             <button
               onClick={() => setShowDemo(true)}
@@ -133,7 +133,7 @@ export default function MedibookProductPage() {
       {/* How It Works */}
       <section className="mx-auto max-w-7xl px-5 sm:px-8 py-16">
         <div className="text-center mb-12">
-          <h2 className="font-display text-3xl font-semibold text-ink-900">How MediBook Works</h2>
+          <h2 className="font-display text-3xl font-semibold text-ink-900">How Healibrate Works</h2>
           <p className="mt-3 text-gray-500">From registration to your first booking — in 6 simple steps</p>
         </div>
 
@@ -146,7 +146,7 @@ export default function MedibookProductPage() {
           <StepCard
             number={2}
             title="Get Your Platform"
-            desc="Receive your own booking URL — e.g., apollo.medibook.com"
+            desc="Receive your own booking URL — e.g., apollo.healibrate.com"
           />
           <StepCard
             number={3}
@@ -269,12 +269,12 @@ export default function MedibookProductPage() {
         </div>
       </section>
 
-      {/* Why Clinics Choose MediBook */}
+      {/* Why Clinics Choose Healibrate */}
       <section className="mx-auto max-w-7xl px-5 sm:px-8 py-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
             <h2 className="font-display text-3xl font-semibold text-ink-900">
-              Why Clinics Choose MediBook
+              Why Clinics Choose Healibrate
             </h2>
             <p className="mt-3 text-gray-500 mb-8">
               We don't put you in a marketplace. You own your platform, your patients, and your growth.
@@ -297,7 +297,7 @@ export default function MedibookProductPage() {
               <div className="rounded-xl bg-white border border-brand-200 px-6 py-4 shadow-sm">
                 <span className="text-gray-400 text-sm">https://</span>
                 <span className="text-brand-700 font-semibold">apollo</span>
-                <span className="text-gray-400 text-sm">.medibook.com</span>
+                <span className="text-gray-400 text-sm">.healibrate.com</span>
               </div>
               <p className="text-sm text-gray-500 mt-4">Share this with patients on WhatsApp, Instagram, or your website.</p>
             </div>
@@ -339,7 +339,7 @@ export default function MedibookProductPage() {
             Ready to Launch Your Booking Platform?
           </h2>
           <p className="text-brand-100 mb-6 max-w-lg mx-auto">
-            Get started in 2 minutes. No credit card required. Free for 14 days.
+            Set up in minutes — plans from ₹99/month, and your patients never need an account.
           </p>
           <button
             onClick={() => navigate('/admin/register')}
@@ -349,7 +349,7 @@ export default function MedibookProductPage() {
               <path d="M8 2L2 7l9 5 9-5-9-5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
               <path d="M2 12l9 5 9-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Start Free — No Credit Card
+            Create Your Clinic
           </button>
         </div>
       </section>
@@ -364,10 +364,10 @@ export default function MedibookProductPage() {
                   <path d="M8 2v12M2 8h12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
                 </svg>
               </span>
-              <span>MediBook</span>
+              <span>Healibrate</span>
             </div>
             <p className="text-sm text-gray-400">
-              &copy; {new Date().getFullYear()} MediBook. All rights reserved.
+              &copy; {new Date().getFullYear()} Healibrate. All rights reserved.
             </p>
             <div className="flex gap-4">
               <button

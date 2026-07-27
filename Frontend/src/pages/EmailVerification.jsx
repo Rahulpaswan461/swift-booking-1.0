@@ -6,6 +6,12 @@ import StepIndicator from '../components/StepIndicator'
 import { useAuth } from '../context/AuthContext'
 import { useClinic } from '../context/ClinicContext'
 
+// SMS (phone) verification is currently OFF — patients verify by email only.
+// To bring phone verification back in the future, flip this to `true`; that
+// restores the Email/Phone toggle below. No backend change is needed — the
+// API already accepts contact_type 'phone'.
+const ENABLE_SMS_VERIFICATION = false
+
 export default function EmailVerification() {
   const [contactType, setContactType] = useState('email') // 'email' | 'phone'
   const [contactValue, setContactValue] = useState('')
@@ -84,33 +90,36 @@ export default function EmailVerification() {
               one-time code — no password, no account to create.
             </p>
 
-            {/* Contact type toggle */}
-            <div className="mb-5 flex rounded-xl bg-gray-50 border border-gray-200 p-1">
-              <button
-                type="button"
-                onClick={() => { setContactType('email'); setContactValue(''); setError('') }}
-                className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition
-                  ${contactType === 'email' ? 'bg-white text-brand-700 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="1.5" y="3" width="13" height="10" rx="2" />
-                  <path d="M2 4.5l6 4.5 6-4.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Email
-              </button>
-              <button
-                type="button"
-                onClick={() => { setContactType('phone'); setContactValue(''); setError('') }}
-                className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition
-                  ${contactType === 'phone' ? 'bg-white text-brand-700 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="4.5" y="1.5" width="7" height="13" rx="1.8" />
-                  <path d="M7 12.5h2" strokeLinecap="round" />
-                </svg>
-                Phone
-              </button>
-            </div>
+            {/* Contact type toggle — shown only when SMS verification is enabled.
+                With it off, contactType stays 'email' and patients verify by email. */}
+            {ENABLE_SMS_VERIFICATION && (
+              <div className="mb-5 flex rounded-xl bg-gray-50 border border-gray-200 p-1">
+                <button
+                  type="button"
+                  onClick={() => { setContactType('email'); setContactValue(''); setError('') }}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition
+                    ${contactType === 'email' ? 'bg-white text-brand-700 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <rect x="1.5" y="3" width="13" height="10" rx="2" />
+                    <path d="M2 4.5l6 4.5 6-4.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Email
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setContactType('phone'); setContactValue(''); setError('') }}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition
+                    ${contactType === 'phone' ? 'bg-white text-brand-700 shadow-sm border border-gray-100' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <rect x="4.5" y="1.5" width="7" height="13" rx="1.8" />
+                    <path d="M7 12.5h2" strokeLinecap="round" />
+                  </svg>
+                  Phone
+                </button>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>

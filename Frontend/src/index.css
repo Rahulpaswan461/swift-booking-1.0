@@ -5,7 +5,7 @@
 @layer base {
   /* Brand palette as RGB triplets so each clinic's primary color can
      re-theme the whole patient portal at runtime (see utils/theme.js).
-     Defaults = the MediBook teal. */
+     Defaults = the Healibrate teal. */
   :root {
     --brand-50: 238 250 247;
     --brand-100: 215 242 236;

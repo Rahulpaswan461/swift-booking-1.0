@@ -256,7 +256,26 @@ export default function BrandingSettings() {
               </div>
             </section>
 
-            {/* Branding */}
+            {/* Branding — gated by plan entitlements */}
+            {clinic?.entitlements?.features?.customBranding === false ? (
+              <section className="rounded-2xl border border-surface-100 bg-white p-8 text-center">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-brand-100 bg-brand-50">
+                  <svg width="20" height="20" viewBox="0 0 18 18" fill="none" stroke="#1d7f72" strokeWidth="1.5">
+                    <rect x="3" y="8" width="12" height="8" rx="2"/>
+                    <path d="M6 8V6a3 3 0 016 0v2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <h2 className="font-display text-lg font-semibold text-ink-900">Custom branding is a Growth feature</h2>
+                <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-gray-500">
+                  Add your logo, brand color, tagline, and credential badges to your booking page
+                  with the Growth plan (₹299/month) or above.
+                </p>
+                <a href="/admin/billing"
+                  className="mt-5 inline-block rounded-xl bg-brand-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700">
+                  View plans & upgrade
+                </a>
+              </section>
+            ) : (
             <form onSubmit={handleSubmit} className="rounded-2xl border border-surface-100 bg-white p-6 space-y-5">
               <div>
                 <h2 className="font-semibold text-ink-900 mb-1">Branding</h2>
@@ -409,6 +428,7 @@ export default function BrandingSettings() {
                 </button>
               </div>
             </form>
+            )}
 
             {/* Operating hours */}
             <section className="rounded-2xl border border-surface-100 bg-white p-6 space-y-5">

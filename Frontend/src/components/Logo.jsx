@@ -8,7 +8,7 @@ export default function Logo({ size = 'md', showClinicName = false }) {
   const logoUrl = branding?.logo_url
 
   // The logo is always a way home — clinic homepage on a clinic
-  // subdomain, MediBook homepage on the platform site.
+  // subdomain, Healibrate homepage on the platform site.
   return (
     <Link to="/" className={`font-display font-semibold ${sizes[size]} text-ink-900 flex items-center gap-2.5 transition hover:opacity-80`}>
       {logoUrl ? (
@@ -27,7 +27,7 @@ export default function Logo({ size = 'md', showClinicName = false }) {
       {showClinicName && clinicName ? (
         <span className="leading-tight">{clinicName}</span>
       ) : (
-        <span>MediBook</span>
+        <span>Healibrate</span>
       )}
     </Link>
   )

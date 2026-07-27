@@ -2,14 +2,60 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PlatformHeader from '../components/PlatformHeader'
 
-const FAQS = [
+// ── Plans — edit prices/features here ─────────────────────────
+// Features marked { soon: true } render with a "Coming soon" tag:
+// sell the roadmap honestly, never as an existing feature.
+const PLANS = [
   {
-    q: 'Is MediBook really free right now?',
-    a: 'Yes. During Early Access every plan and every feature is free — no card, no limits, no catch. We want feedback from real clinics before we want payments.',
+    name: 'Basic',
+    price: 99,
+    tagline: 'For solo practitioners getting started',
+    features: [
+      { label: '1 doctor' },
+      { label: 'Your own booking page & link' },
+      { label: 'Appointment management (completed / no-show)' },
+      { label: 'Email confirmations & reminders' },
+      { label: 'Cancel & reschedule links for patients' },
+    ],
   },
   {
-    q: 'What happens when paid plans launch?',
-    a: "You'll be notified well in advance and nothing will ever be charged automatically. Your data stays exactly where it is, and clinics that join during Early Access get preferential terms when pricing begins.",
+    name: 'Growth',
+    price: 299,
+    highlighted: true,
+    tagline: 'For clinics building their patient base',
+    features: [
+      { label: 'Everything in Basic' },
+      { label: 'Up to 5 doctors' },
+      { label: 'Custom branding & credential badges' },
+      { label: 'Patient profiles created automatically on first visit' },
+      { label: 'Patient summary with visit tags' },
+      { label: 'Product support' },
+    ],
+  },
+  {
+    name: 'Pro',
+    price: 499,
+    tagline: 'For established multi-doctor clinics',
+    features: [
+      { label: 'Everything in Growth' },
+      { label: 'Unlimited doctors' },
+      { label: 'Session notes & full patient history' },
+      { label: 'SMS confirmations (usage billed separately)' },
+      { label: 'Social media integration', soon: true },
+      { label: 'Patient note requests', soon: true },
+      { label: 'Free onboarding assistance' },
+    ],
+  },
+]
+
+const FAQS = [
+  {
+    q: 'Can my clinic change plans later?',
+    a: 'Yes — you can move up or down between plans at any time as your clinic grows. Your booking page, doctors, and patient records carry over exactly as they are.',
+  },
+  {
+    q: 'Will prices change?',
+    a: "If pricing ever changes, every clinic gets plenty of notice in advance. Nothing is ever charged without you knowing exactly what and when.",
   },
   {
     q: 'Do my patients need to create accounts or install an app?',
@@ -25,11 +71,11 @@ const FAQS = [
   },
   {
     q: 'What if I need help getting set up?',
-    a: 'Message us from the Contact page or the Help & Support button inside your dashboard. Early Access clinics get priority — you’re talking to the people building the product, not a ticket queue.',
+    a: 'Message us from the Contact page or the Help & Support button inside your dashboard — you’re talking to the people building the product, not a ticket queue.',
   },
   {
     q: 'Can my clinic leave anytime?',
-    a: 'Of course. There is no lock-in and no contract. If MediBook isn’t making your clinic’s life easier, you can stop using it any day.',
+    a: 'Of course. There is no lock-in and no contract. If Healibrate isn’t making your clinic’s life easier, you can stop using it any day.',
   },
 ]
 
@@ -59,50 +105,6 @@ function FaqItem({ item, open, onToggle }) {
   )
 }
 
-// ── Planned pricing — placeholders, edit freely before launch ──
-// Shown with "Free during Early Access" so future pricing never
-// comes as a surprise to clinics already on the platform.
-const PLANS = [
-  {
-    name: 'Starter',
-    price: 0,
-    tagline: 'For solo practitioners getting started',
-    features: [
-      '1 doctor',
-      '50 bookings / month',
-      'Your own booking page & link',
-      'Email confirmations & reminders',
-      'Cancel / reschedule links for patients',
-    ],
-  },
-  {
-    name: 'Pro',
-    price: 999,
-    highlighted: true,
-    tagline: 'For growing clinics with multiple doctors',
-    features: [
-      'Up to 5 doctors',
-      'Unlimited bookings',
-      'Custom branding & badges',
-      'SMS confirmations (usage billed separately)',
-      'Session notes & patient history',
-      'Priority support',
-    ],
-  },
-  {
-    name: 'Enterprise',
-    price: 2499,
-    tagline: 'For hospitals and multi-branch clinics',
-    features: [
-      'Unlimited doctors',
-      'Unlimited bookings',
-      'Everything in Pro',
-      'Onboarding assistance',
-      'Dedicated support',
-    ],
-  },
-]
-
 export default function PricingPage() {
   const navigate = useNavigate()
   const [openFaq, setOpenFaq] = useState(0)
@@ -112,21 +114,14 @@ export default function PricingPage() {
       <PlatformHeader />
 
       <main className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
-        {/* Early Access banner */}
+        {/* Heading */}
         <div className="mx-auto mb-10 max-w-2xl text-center animate-fade-up">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-4 py-2 text-sm font-bold text-green-700">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M7 1l1.8 3.6L13 5.2l-3 2.9.7 4L7 10.2 3.3 12.1l.7-4-3-2.9 4.2-.6L7 1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-            </svg>
-            Early Access — every plan is free right now
-          </div>
           <h1 className="font-display text-4xl font-semibold text-ink-900 sm:text-5xl">
-            Simple pricing, when it arrives
+            Simple pricing that grows with your clinic
           </h1>
           <p className="mt-4 text-lg leading-8 text-gray-600">
-            MediBook is completely free while we're in Early Access — no card, no limits, no catch.
-            These are the plans we intend to launch later, so there are never any surprises.
-            Every clinic will be notified well in advance.
+            Start small, upgrade when you're ready. Every plan includes your own booking
+            page, automatic confirmations, and patients who never need to create an account.
           </p>
         </div>
 
@@ -148,32 +143,27 @@ export default function PricingPage() {
               <h2 className="font-display text-2xl font-semibold text-ink-900">{plan.name}</h2>
               <p className="mt-1 text-sm text-gray-500">{plan.tagline}</p>
 
-              {/* Price — future price struck through, free now */}
-              <div className="mt-5 flex items-end gap-2">
-                {plan.price > 0 ? (
-                  <>
-                    <span className="text-lg font-semibold text-gray-400 line-through">₹{plan.price.toLocaleString('en-IN')}</span>
-                    <span className="font-display text-4xl font-semibold text-ink-900">₹0</span>
-                    <span className="pb-1 text-sm text-gray-400">/month</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="font-display text-4xl font-semibold text-ink-900">₹0</span>
-                    <span className="pb-1 text-sm text-gray-400">/month</span>
-                  </>
-                )}
+              <div className="mt-5 flex items-end gap-1.5">
+                <span className="font-display text-4xl font-semibold text-ink-900">
+                  ₹{plan.price.toLocaleString('en-IN')}
+                </span>
+                <span className="pb-1 text-sm text-gray-400">/month</span>
               </div>
-              <p className="mt-1 text-xs font-semibold text-green-600">
-                {plan.price > 0 ? 'Free during Early Access' : 'Free forever'}
-              </p>
 
               <ul className="mt-6 flex-1 space-y-3">
                 {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm text-gray-600">
+                  <li key={f.label} className="flex items-start gap-2.5 text-sm text-gray-600">
                     <svg className="mt-0.5 flex-shrink-0" width="15" height="15" viewBox="0 0 14 14" fill="none">
                       <path d="M2.5 7l3 3 6-6" stroke="#1d7f72" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    {f}
+                    <span>
+                      {f.label}
+                      {f.soon && (
+                        <span className="ml-2 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                          Coming soon
+                        </span>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -185,7 +175,7 @@ export default function PricingPage() {
                     ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20 hover:bg-brand-700'
                     : 'border border-gray-200 bg-white text-gray-700 hover:border-brand-300 hover:bg-brand-50'}`}
               >
-                Get started free
+                Get started
               </button>
             </div>
           ))}
@@ -217,7 +207,7 @@ export default function PricingPage() {
       </main>
 
       <footer className="border-t border-gray-100 py-8 text-center text-sm text-gray-400">
-        MediBook — Appointment Management Platform
+        Healibrate — Appointment Management Platform
       </footer>
     </div>
   )

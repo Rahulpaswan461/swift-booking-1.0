@@ -106,18 +106,31 @@ function PatientHistoryModal({ patient, onClose }) {
 
         {/* Visit stats strip */}
         {summary && (
-          <div className="grid grid-cols-4 divide-x divide-gray-100 border-b border-gray-100 bg-surface-50/60 flex-shrink-0">
-            {[
-              { label: 'Total visits', value: summary.total, cls: 'text-ink-900' },
-              { label: 'Completed', value: summary.completed, cls: 'text-green-600' },
-              { label: 'Cancelled', value: summary.cancelled, cls: 'text-red-500' },
-              { label: 'No-shows', value: summary.no_show, cls: 'text-amber-600' },
-            ].map(s => (
-              <div key={s.label} className="px-4 py-3 text-center">
-                <p className={`text-lg font-bold ${s.cls}`}>{s.value}</p>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{s.label}</p>
+          <div className="flex-shrink-0 border-b border-gray-100 bg-surface-50/60">
+            <div className="grid grid-cols-4 divide-x divide-gray-100">
+              {[
+                { label: 'Total visits', value: summary.total, cls: 'text-ink-900' },
+                { label: 'Completed', value: summary.completed, cls: 'text-green-600' },
+                { label: 'Cancelled', value: summary.cancelled, cls: 'text-red-500' },
+                { label: 'No-shows', value: summary.no_show, cls: 'text-amber-600' },
+              ].map(s => (
+                <div key={s.label} className="px-4 py-3 text-center">
+                  <p className={`text-lg font-bold ${s.cls}`}>{s.value}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{s.label}</p>
+                </div>
+              ))}
+            </div>
+            {/* Patient summary: visit reasons aggregated from tags */}
+            {summary.visit_tags?.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 px-5 py-2.5">
+                <span className="mr-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Visit reasons</span>
+                {summary.visit_tags.map(tag => (
+                  <span key={tag} className="rounded-full border border-brand-100 bg-brand-50 px-2.5 py-0.5 text-[11px] font-semibold text-brand-700">
+                    {tag}
+                  </span>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
 
@@ -178,26 +191,35 @@ function PatientHistoryModal({ patient, onClose }) {
                       })}
                     </div>
                   )}
-                  {appt.session_notes?.session_notes && (
+                  {appt.session_notes && (
                     <div className="mt-3 rounded-lg bg-purple-50 border border-purple-100 p-3 space-y-1.5">
-                      {appt.session_notes.session_notes.notes && (
+                      {appt.session_notes.tags?.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pb-1">
+                          {appt.session_notes.tags.map(tag => (
+                            <span key={tag} className="rounded-full border border-purple-200 bg-white px-2 py-0.5 text-[10px] font-bold text-purple-700">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {appt.session_notes.notes && (
                         <p className="text-xs text-gray-700">
-                          <span className="font-semibold text-purple-700">Notes:</span> {appt.session_notes.session_notes.notes}
+                          <span className="font-semibold text-purple-700">Notes:</span> {appt.session_notes.notes}
                         </p>
                       )}
-                      {appt.session_notes.session_notes.diagnosis && (
+                      {appt.session_notes.diagnosis && (
                         <p className="text-xs text-gray-700">
-                          <span className="font-semibold text-purple-700">Diagnosis:</span> {appt.session_notes.session_notes.diagnosis}
+                          <span className="font-semibold text-purple-700">Diagnosis:</span> {appt.session_notes.diagnosis}
                         </p>
                       )}
-                      {appt.session_notes.session_notes.prescription && (
+                      {appt.session_notes.prescription && (
                         <p className="text-xs text-gray-700">
-                          <span className="font-semibold text-purple-700">Prescription:</span> {appt.session_notes.session_notes.prescription}
+                          <span className="font-semibold text-purple-700">Prescription:</span> {appt.session_notes.prescription}
                         </p>
                       )}
-                      {appt.session_notes.session_notes.follow_up_date && (
+                      {appt.session_notes.follow_up_date && (
                         <p className="text-xs text-gray-700">
-                          <span className="font-semibold text-purple-700">Follow-up:</span> {formatDate(appt.session_notes.session_notes.follow_up_date)}
+                          <span className="font-semibold text-purple-700">Follow-up:</span> {formatDate(appt.session_notes.follow_up_date)}
                         </p>
                       )}
                     </div>
@@ -215,11 +237,15 @@ function PatientHistoryModal({ patient, onClose }) {
 /**
  * Session Notes Modal — lets the doctor add/view notes for an appointment
  */
+const SUGGESTED_TAGS = ['First visit', 'Follow-up', 'Review', 'Back pain', 'Neck pain', 'Knee pain', 'Post-surgery rehab', 'Sports injury']
+
 function SessionNotesModal({ appointment, onClose, onSave }) {
   const [notes, setNotes] = useState('')
   const [diagnosis, setDiagnosis] = useState('')
   const [prescription, setPrescription] = useState('')
   const [followUpDate, setFollowUpDate] = useState('')
+  const [tags, setTags] = useState([])
+  const [tagInput, setTagInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [existing, setExisting] = useState(null)
 
@@ -233,10 +259,23 @@ function SessionNotesModal({ appointment, onClose, onSave }) {
           setDiagnosis(res.data.data.diagnosis || '')
           setPrescription(res.data.data.prescription || '')
           setFollowUpDate(res.data.data.follow_up_date || '')
+          setTags(res.data.data.tags || [])
         }
       })
       .catch(console.error)
   }, [appointment.id])
+
+  const toggleTag = (tag) => {
+    setTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : prev.length < 6 ? [...prev, tag] : prev)
+  }
+
+  const addCustomTag = () => {
+    const t = tagInput.trim().slice(0, 30)
+    if (t && !tags.includes(t) && tags.length < 6) {
+      setTags([...tags, t])
+      setTagInput('')
+    }
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -245,7 +284,8 @@ function SessionNotesModal({ appointment, onClose, onSave }) {
         notes,
         diagnosis: diagnosis || undefined,
         prescription: prescription || undefined,
-        follow_up_date: followUpDate || undefined
+        follow_up_date: followUpDate || undefined,
+        tags,
       })
       onSave?.()
       onClose()
@@ -282,6 +322,43 @@ function SessionNotesModal({ appointment, onClose, onSave }) {
 
         {/* Form */}
         <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+          {/* Visit tags */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Visit tags <span className="text-gray-400 font-normal">(why did the patient come? — up to 6)</span>
+            </label>
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {[...new Set([...SUGGESTED_TAGS, ...tags])].map(tag => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => toggleTag(tag)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition
+                    ${tags.includes(tag)
+                      ? 'border-brand-600 bg-brand-600 text-white shadow-sm'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-brand-300 hover:bg-brand-50'}`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={tagInput}
+                maxLength={30}
+                onChange={e => setTagInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomTag() } }}
+                placeholder="Add your own tag…"
+                className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+              />
+              <button type="button" onClick={addCustomTag}
+                className="rounded-xl border border-gray-200 px-3.5 py-2 text-xs font-semibold text-gray-600 transition hover:bg-gray-50">
+                Add
+              </button>
+            </div>
+          </div>
+
           {/* Notes */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -445,14 +522,24 @@ function PatientsView({ onOpenHistory }) {
                     <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">Completed</p>
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-700 mt-1">{formatDate(p.last_visit.date)}</p>
+                    <p className="text-sm font-semibold text-gray-700 mt-1 whitespace-nowrap">{formatDate(p.last_visit.date)}</p>
                     <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">Last visit</p>
                   </div>
-                  <div className="mt-1"><StatusBadge status={p.last_visit.status} /></div>
                 </div>
 
                 {/* Last discussed */}
                 <div className="flex-1 min-w-0">
+                  <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                    <StatusBadge status={p.last_visit.status} />
+                    {p.visit_tags?.slice(0, 4).map(tag => (
+                      <span key={tag} className="rounded-full border border-brand-100 bg-brand-50 px-2 py-0.5 text-[10px] font-bold text-brand-700">
+                        {tag}
+                      </span>
+                    ))}
+                    {p.visit_tags?.length > 4 && (
+                      <span className="text-[10px] font-semibold text-gray-400">+{p.visit_tags.length - 4}</span>
+                    )}
+                  </div>
                   {p.last_notes ? (
                     <div className="rounded-xl bg-purple-50/70 border border-purple-100 px-3 py-2">
                       <p className="text-[11px] font-bold uppercase tracking-wide text-purple-600 mb-0.5">Last discussed</p>
