@@ -7,7 +7,7 @@ Patients can book appointments via OTP verification, doctors manage schedules, a
 
 ## 🌐 Live Links
 
-* **Frontend:** https://your-frontend.vercel.app
+* **Frontend:** https://swift-booking-1-0.vercel.app/
 * **Backend API:** https://swift-booking-1-0-1.onrender.com
 
 ---
