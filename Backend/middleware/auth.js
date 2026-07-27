@@ -15,8 +15,14 @@ export const protect = async (req, res, next) => {
         next()
     }
     catch (error) {
-        console.error("Error while verifying token", error)
-        return res.status(401).json({ success: false, message: "Invalid or Expired token" })
+        // An expired token is a NORMAL event (patient sessions last 12h) — the
+        // frontend clears it and re-verifies. Don't log it as an error; only
+        // genuinely malformed/invalid tokens are worth a warning.
+        if (error.name === "TokenExpiredError") {
+            return res.status(401).json({ success: false, message: "Session expired. Please verify again.", code: "token_expired" })
+        }
+        console.warn("Patient token invalid:", error.message)
+        return res.status(401).json({ success: false, message: "Invalid token", code: "token_invalid" })
     }
 }
 

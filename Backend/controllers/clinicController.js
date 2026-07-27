@@ -2,7 +2,8 @@ import supabase from "../config/supabase.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { buildClinicUrl } from "../utils/clinicUrl.js";
-import { invalidateTenantCache, EARLY_ACCESS } from "../middleware/tenant.js";
+import { invalidateTenantCache, EARLY_ACCESS, requestHost } from "../middleware/tenant.js";
+import { entitlementsFor } from "../config/plans.js";
 
 // Slug validation: lowercase a-z, 0-9, hyphens only, 3-50 chars
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{2,49}$/;
@@ -32,7 +33,9 @@ async function generateUniqueSlug(name) {
 
 /**
  * Clinic self-registration
- * Creates a clinic row + linked admin row + sets trial_ends_at to 14 days.
+ * Creates a clinic row + linked admin row in an UNPAID state
+ * (subscription_plan = null, no trial). The clinic is inactive for booking
+ * until the admin picks and pays for a plan on the billing page.
  * Slug is auto-generated from the clinic name when not provided.
  */
 export const registerClinic = async (req, res) => {
@@ -106,9 +109,8 @@ export const registerClinic = async (req, res) => {
         address: address || null,
         specialization: specialization || null,
         is_active: true,
-        subscription_plan: "free",
-        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
-          .toISOString(), // 14 days from now
+        // Unpaid until the admin subscribes — no free plan, no trial.
+        subscription_plan: null,
       })
       .select("*")
       .single();
@@ -166,7 +168,7 @@ export const registerClinic = async (req, res) => {
         specialization: clinic.specialization,
         is_active: clinic.is_active,
         subscription_plan: clinic.subscription_plan,
-        trial_ends_at: clinic.trial_ends_at,
+        subscription_active: false,
         subdomain_url: subdomainUrl,
       },
       admin: {
@@ -369,11 +371,17 @@ export const getMyClinic = async (req, res) => {
 
     // select("*") + whitelist below so a not-yet-migrated column
     // (e.g. operating_hours) can never break this endpoint
-    const { data: clinic, error } = await supabase
-      .from("clinics")
-      .select("*")
-      .eq("id", clinicId)
-      .single()
+    const [{ data: clinic, error }, { data: activeSub }] = await Promise.all([
+      supabase.from("clinics").select("*").eq("id", clinicId).single(),
+      supabase
+        .from("subscriptions")
+        .select("plan, status")
+        .eq("clinic_id", clinicId)
+        .eq("status", "active")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .then((r) => ({ data: r.data?.[0] || null }), () => ({ data: null })),
+    ])
 
     if (error || !clinic) {
       return res.status(404).json({
@@ -381,6 +389,21 @@ export const getMyClinic = async (req, res) => {
         message: "Clinic not found.",
       })
     }
+
+    // A clinic is "paid" when Early Access is on, or it has an active
+    // subscription. The billing page uses this to show the current plan
+    // vs. a "choose a plan" prompt.
+    const subscriptionActive = EARLY_ACCESS || !!activeSub
+
+    // The plan shown to the admin. Prefer the active subscription's plan;
+    // during early access fall back to the clinic's stored plan for the label.
+    const activePlan = activeSub?.plan || (EARLY_ACCESS ? clinic.subscription_plan : null)
+
+    // Entitlements MUST derive from an actually-active subscription (or early
+    // access), never from a stale clinics.subscription_plan. Otherwise a
+    // clinic whose plan column was set but has no active subscription would
+    // wrongly unlock paid features (e.g. branding).
+    const entitlementPlan = subscriptionActive ? activePlan : null
 
     return res.status(200).json({
       success: true,
@@ -393,9 +416,12 @@ export const getMyClinic = async (req, res) => {
         branding: clinic.branding || null,
         operating_hours: clinic.operating_hours ?? null,
         is_active: clinic.is_active,
-        subscription_plan: clinic.subscription_plan,
-        trial_ends_at: clinic.trial_ends_at,
+        subscription_plan: subscriptionActive ? activePlan : null,
+        subscription_active: subscriptionActive,
         early_access: EARLY_ACCESS,
+        // Plan entitlements — the frontend gates features on `features.*`.
+        // Only meaningful once subscription_active is true.
+        entitlements: entitlementsFor({ subscription_plan: entitlementPlan }),
         subdomain_url: buildClinicUrl(clinic.slug),
       },
     })
@@ -432,7 +458,7 @@ export const resolveClinic = async (req, res) => {
     }
 
     // Otherwise, resolve manually from Host header
-    const host = req.headers.host || "";
+    const host = requestHost(req);
     const parts = host.split(".");
     const subdomain = parts[0]?.toLowerCase();
 

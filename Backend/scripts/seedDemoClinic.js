@@ -9,7 +9,7 @@ dotenv.config()
  */
 
 const DEMO_CLINIC_SLUG = 'demo-clinic'
-const DEMO_ADMIN_EMAIL = 'demo@medibook.com'
+const DEMO_ADMIN_EMAIL = 'demo@healibrate.com'
 const DEMO_ADMIN_PASSWORD = 'demo1234'
 
 async function seedDemoClinic() {
@@ -26,18 +26,17 @@ async function seedDemoClinic() {
       const { data: newClinic, error: clinicError } = await supabase
         .from('clinics')
         .insert({
-          name: 'MediBook Demo Clinic',
+          name: 'Healibrate Demo Clinic',
           slug: DEMO_CLINIC_SLUG,
           address: '42 Demo Street, Healthcare City',
           specialization: 'Multi-Specialty',
           owner_email: DEMO_ADMIN_EMAIL,
           is_active: true,
           subscription_plan: 'pro',
-          trial_ends_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // 1 year
           branding: {
-            clinic_name: 'MediBook Demo Clinic',
+            clinic_name: 'Healibrate Demo Clinic',
             primary_color: '#0171be',
-            tagline: 'Experience the power of MediBook — your own booking platform',
+            tagline: 'Experience the power of Healibrate — your own booking platform',
           },
         })
         .select('*')
@@ -76,9 +75,9 @@ async function seedDemoClinic() {
 
     // 3. Create demo doctors (if not already created for this clinic)
     const demoDoctors = [
-      { full_name: 'Dr. Sarah Johnson', email: 'sarah@demo.medibook', specialization: 'Cardiology', qualification: 'MBBS, MD (Cardiology)' },
-      { full_name: 'Dr. Amit Patel', email: 'amit@demo.medibook', specialization: 'Dermatology', qualification: 'MBBS, MD (Dermatology)' },
-      { full_name: 'Dr. Priya Sharma', email: 'priya@demo.medibook', specialization: 'Pediatrics', qualification: 'MBBS, DCH' },
+      { full_name: 'Dr. Sarah Johnson', email: 'sarah@demo.healibrate', specialization: 'Cardiology', qualification: 'MBBS, MD (Cardiology)' },
+      { full_name: 'Dr. Amit Patel', email: 'amit@demo.healibrate', specialization: 'Dermatology', qualification: 'MBBS, MD (Dermatology)' },
+      { full_name: 'Dr. Priya Sharma', email: 'priya@demo.healibrate', specialization: 'Pediatrics', qualification: 'MBBS, DCH' },
     ]
 
     const { data: existingDoctors } = await supabase

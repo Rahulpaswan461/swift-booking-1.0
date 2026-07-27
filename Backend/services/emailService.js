@@ -1,5 +1,8 @@
 import nodemailer from "nodemailer"
 import { buildClinicUrl } from "../utils/clinicUrl.js"
+import createLogger from "../utils/logger.js"
+
+const log = createLogger("email")
 
 // Any SMTP relay works — set SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS
 // (e.g. Brevo: smtp-relay.brevo.com:587, free 300 emails/day).
@@ -36,7 +39,7 @@ function accentOf(clinic) {
 }
 
 function displayNameOf(clinic) {
-  return clinic?.branding?.clinic_name || clinic?.name || "MediBook"
+  return clinic?.branding?.clinic_name || clinic?.name || "Healibrate"
 }
 
 function formatTime12h(time) {
@@ -106,13 +109,13 @@ function emailLayout({ clinic, title, preheader = "", bodyHtml }) {
         <!-- Footer -->
         <tr><td style="padding:20px 32px; background:#f9fafb; border-top:1px solid #eef1f4;">
           <p style="margin:0; color:#9ca3af; font-size:12px; line-height:1.7;">
-            This message was sent by <strong style="color:#6b7280;">${clinicName}</strong> via MediBook.<br>
+            This message was sent by <strong style="color:#6b7280;">${clinicName}</strong> via Healibrate.<br>
             This is an automated email — please do not reply directly.
           </p>
         </td></tr>
 
       </table>
-      <p style="margin:14px 0 0 0; color:#b3bac2; font-size:11px;">Powered by MediBook — clinic appointment management</p>
+      <p style="margin:14px 0 0 0; color:#b3bac2; font-size:11px;">Powered by Healibrate — clinic appointment management</p>
     </td></tr>
   </table>
 </body>
@@ -125,21 +128,59 @@ function emailLayout({ clinic, title, preheader = "", bodyHtml }) {
  */
 export async function sendPlainEmail({ to, subject, html }) {
   return transporter.sendMail({
-    from: `"MediBook" <${FROM_ADDRESS}>`,
+    from: `"Healibrate" <${FROM_ADDRESS}>`,
     to,
     subject,
     html,
   })
 }
 
-async function send({ to, subject, html, clinic }) {
-  const res =  transporter.sendMail({
-    from: `"${displayNameOf(clinic)}" <${FROM_ADDRESS}>`,
-    to,
-    subject,
-    html,
-  })
-  return res;
+async function send({ to, subject, html, clinic, type = "email" }) {
+  if (!to) {
+    log.warn("Email skipped — no recipient address", { type, subject })
+    return null
+  }
+  const from = `"${displayNameOf(clinic)}" <${FROM_ADDRESS}>`
+  try {
+    const res = await transporter.sendMail({ from, to, subject, html })
+    log.info("Email sent", { type, to, messageId: res.messageId })
+    return res
+  } catch (err) {
+    // The one line that was missing when email "silently" broke: it names
+    // the recipient, the SMTP error code, and the relay's response.
+    log.error("Email send FAILED", {
+      type, to, from: FROM_ADDRESS,
+      error: err.message,
+      code: err.code,
+      command: err.command,
+      response: err.response,
+    })
+    throw err
+  }
+}
+
+/**
+ * Verify the SMTP connection at startup so a bad host/credential is caught
+ * immediately (logged loudly) instead of silently failing on the first email.
+ * Call once during server boot.
+ */
+export async function verifyEmailTransport() {
+  const usingSmtp = !!process.env.SMTP_HOST
+  const target = usingSmtp ? `${process.env.SMTP_HOST}:${process.env.SMTP_PORT || 587}` : "gmail"
+  try {
+    await transporter.verify()
+    log.info("SMTP transport ready", { target, from: FROM_ADDRESS })
+    return true
+  } catch (err) {
+    log.error("SMTP transport verification FAILED — emails will not send", {
+      target,
+      user: process.env.SMTP_USER || process.env.EMAIL_USER || "(unset)",
+      from: FROM_ADDRESS || "(unset)",
+      error: err.message,
+      code: err.code,
+    })
+    return false
+  }
 }
 
 // Links in patient emails point at the clinic's own subdomain when we
@@ -175,7 +216,7 @@ export const sendOtpEmail = async ({ email, otp, clinic, ttlSeconds = 600 }) => 
       </p>`,
   })
 
-  await send({ to: email, subject: `${otp} is your ${clinicName} verification code`, html, clinic })
+  return send({ to: email, subject: `${otp} is your ${clinicName} verification code`, html, clinic, type: "otp" })
 }
 
 // ── Booking confirmation ──────────────────────────────────────
@@ -217,6 +258,7 @@ export const sendBookingConfirmationEmail = async ({ appointment, patient, docto
     subject: `Appointment confirmed — Dr. ${doctor?.full_name || doctor?.fullName}, ${formatDateLong(appointment_date)}`,
     html,
     clinic,
+    type: "booking_confirmation",
   })
 }
 
@@ -256,6 +298,7 @@ export const sendRescheduleConfirmationEmail = async ({ appointment, oldTime, pa
     subject: `Appointment rescheduled — now ${formatDateLong(appointment_date)}, ${formatTime12h(appointment_time)}`,
     html,
     clinic,
+    type: "reschedule_confirmation",
   })
 }
 
@@ -293,6 +336,7 @@ export const sendCancellationEmail = async ({ appointment, patient, doctor, clin
     subject: `Appointment cancelled — ${formatDateLong(appointment.appointment_date)}`,
     html,
     clinic,
+    type: "cancellation",
   })
 }
 
@@ -327,7 +371,7 @@ export const sendWelcomeEmail = async ({ doctor, tempPassword, clinic, loginUrl 
       </div>`,
   })
 
-  await send({ to: doctor.email, subject: `Your doctor account at ${clinicName}`, html, clinic })
+  await send({ to: doctor.email, subject: `Your doctor account at ${clinicName}`, html, clinic, type: "doctor_welcome" })
   return true
 }
 
@@ -368,5 +412,6 @@ export const sendReminderEmail = async ({ patient, doctor, appointment, clinic }
     subject: `Reminder: appointment tomorrow at ${formatTime12h(appointment.appointment_time)} — ${clinicName}`,
     html,
     clinic,
+    type: "reminder",
   })
 }

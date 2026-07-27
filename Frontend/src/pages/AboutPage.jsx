@@ -11,7 +11,7 @@ const PRINCIPLES = [
   },
   {
     title: 'Your clinic stays yours',
-    desc: 'Your doctors, your patients, your appointments — private to your clinic, always. We never sell or share your data, and you can stop using MediBook any day, no strings attached.',
+    desc: 'Your doctors, your patients, your appointments — private to your clinic, always. We never sell or share your data, and you can stop using Healibrate any day, no strings attached.',
   },
   {
     title: 'Nothing fake, ever',
@@ -19,7 +19,7 @@ const PRINCIPLES = [
   },
   {
     title: 'We build with you',
-    desc: 'MediBook is free during Early Access while we shape it with feedback from real clinics. The clinics using it today decide what we build tomorrow.',
+    desc: 'Healibrate is shaped by feedback from real clinics. The clinics using it today decide what we build tomorrow — and talking to us means talking to the people who build it.',
   },
 ]
 
@@ -34,7 +34,7 @@ export default function AboutPage() {
         {/* Editorial hero — left-aligned, quiet */}
         <div className="animate-fade-up">
           <div className="mb-6 h-1 w-14 rounded-full bg-brand-600" />
-          <p className="mb-4 text-xs font-bold uppercase tracking-[0.24em] text-brand-600">About MediBook</p>
+          <p className="mb-4 text-xs font-bold uppercase tracking-[0.24em] text-brand-600">About Healibrate</p>
           <h1 className="font-display text-4xl font-semibold leading-tight text-ink-900 sm:text-5xl">
             More time for patients.<br />Less time on the phone.
           </h1>
@@ -52,7 +52,7 @@ export default function AboutPage() {
             for them. Big hospital chains get custom systems and IT teams. Everyone else gets chaos.
           </p>
           <p className="font-medium text-ink-900">
-            MediBook closes that gap: every clinic gets its own booking page, doctor portal,
+            Healibrate closes that gap: every clinic gets its own booking page, doctor portal,
             and patient records — ready in minutes, and simple enough that no one needs training.
           </p>
         </div>
@@ -103,9 +103,9 @@ export default function AboutPage() {
         <div className="mt-16 border-l-2 border-brand-600 pl-6 animate-fade-up delay-200 sm:pl-8">
           <h2 className="mb-4 font-display text-2xl font-semibold text-ink-900">Our promise to every clinic</h2>
           <ul className="space-y-3 text-[15px] leading-relaxed text-gray-600">
-            <li>MediBook is <strong className="text-ink-900">free during Early Access</strong> — every feature, no card, no limits.</li>
-            <li>You'll get <strong className="text-ink-900">plenty of notice</strong> before pricing ever begins, and nothing is charged automatically.</li>
-            <li>Clinics that join during Early Access get <strong className="text-ink-900">preferential terms</strong> when paid plans arrive.</li>
+            <li><strong className="text-ink-900">Simple, transparent pricing</strong> — plans start at ₹99/month, published openly for everyone.</li>
+            <li>You'll get <strong className="text-ink-900">plenty of notice</strong> before any pricing change, and nothing is ever charged without you knowing.</li>
+            <li><strong className="text-ink-900">No lock-in, no contract</strong> — your clinic can leave any day, and your data is never held hostage.</li>
           </ul>
         </div>
 
@@ -131,7 +131,7 @@ export default function AboutPage() {
       </main>
 
       <footer className="border-t border-gray-100 py-8 text-center text-sm text-gray-400">
-        MediBook — Appointment Management Platform
+        Healibrate — Appointment Management Platform
       </footer>
     </div>
   )

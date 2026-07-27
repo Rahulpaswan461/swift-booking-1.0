@@ -142,12 +142,24 @@ export default function ClinicLanding() {
             <h1 className="max-w-2xl font-display text-5xl font-semibold leading-[1.05] text-ink-900 sm:text-6xl">
               Book your appointment at <span className="text-brand-600">{clinicName}</span>
             </h1>
-            <p className="mt-6 max-w-xl text-lg leading-8 text-gray-600">
-              {tagline ||
-                (specializations.length > 0
-                  ? `Verified specialists across ${specializations.slice(0, 3).join(', ').toLowerCase()}${specializations.length > 3 ? ' and more' : ''}. Direct booking, instant confirmation — powered by MediBook.`
-                  : 'Choose your doctor, pick a convenient time, and get confirmed instantly. No account needed.')}
-            </p>
+            {/* Subtitle: prefer the clinic's tagline. Without one, the copy is
+                derived from the doctors' specializations — which load async, so
+                render a skeleton until they arrive instead of flashing the
+                generic fallback first and then swapping to the real line. */}
+            {tagline ? (
+              <p className="mt-6 max-w-xl text-lg leading-8 text-gray-600">{tagline}</p>
+            ) : doctorLoading ? (
+              <div className="mt-6 max-w-xl space-y-2.5" aria-hidden="true">
+                <div className="h-5 w-full animate-pulse rounded bg-gray-100" />
+                <div className="h-5 w-2/3 animate-pulse rounded bg-gray-100" />
+              </div>
+            ) : (
+              <p className="mt-6 max-w-xl text-lg leading-8 text-gray-600">
+                {specializations.length > 0
+                  ? `Verified specialists across ${specializations.slice(0, 3).join(', ').toLowerCase()}${specializations.length > 3 ? ' and more' : ''}. Direct booking, instant confirmation — powered by Healibrate.`
+                  : 'Choose your doctor, pick a convenient time, and get confirmed instantly. No account needed.'}
+              </p>
+            )}
 
             {/* Clinic-defined credential badges (set in clinic settings) */}
             {badges.length > 0 && (
@@ -531,7 +543,7 @@ export default function ClinicLanding() {
           <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <Logo size="sm" />
             <p className="text-sm text-gray-400">
-              Powered by MediBook — Appointment Management Platform
+              Powered by Healibrate — Appointment Management Platform
             </p>
             <div className="flex items-center gap-4">
               <span className="text-xs uppercase tracking-wider text-gray-300">Staff access</span>

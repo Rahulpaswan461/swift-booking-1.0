@@ -1,4 +1,4 @@
-# 🏥 MediBook — Clinic Appointment Booking System
+# 🏥 Healibrate — Clinic Appointment Booking System
 
 A full-stack **SaaS appointment booking system** built for clinics.
 Patients can book appointments via OTP verification, doctors manage schedules, and admins control everything from a centralized dashboard.
@@ -98,7 +98,7 @@ Patients can book appointments via OTP verification, doctors manage schedules, a
 ## 📁 Project Structure
 
 ```bash
-medibook/
+healibrate/
 ├── frontend/
 │   ├── src/
 │   │   ├── api/
@@ -177,8 +177,8 @@ medibook/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/medibook.git
-cd medibook
+git clone https://github.com/your-username/healibrate.git
+cd healibrate
 ```
 
 ### 2. Setup Backend

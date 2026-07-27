@@ -2,8 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ClinicProvider, useClinic } from './context/ClinicContext'
 
-// Medibook product page (shown when no tenant is resolved)
-import MedibookProductPage from './pages/MedibookProductPage'
+// Healibrate product page (shown when no tenant is resolved)
+import HealibrateProductPage from './pages/HealibrateProductPage'
 import PricingPage from './pages/PricingPage'
 import AboutPage from './pages/AboutPage'
 import ContactPage from './pages/ContactPage'
@@ -34,6 +34,7 @@ import AdminDashboard    from './pages/admin/AdminDashboard'
 import AdminAppointments from './pages/admin/AdminAppointments'
 import AdminDoctors      from './pages/admin/AdminDoctors'
 import BrandingSettings  from './pages/admin/BrandingSettings'
+import BillingPage       from './pages/admin/BillingPage'
 
 // ── Route Guards ──────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ function AdminRoute({ children }) {
 
 // ── Conditional Layout ────────────────────────────────────────
 // When a tenant (clinic) is resolved → show the clinic's patient portal
-// When no tenant → show the Medibook product page (for clinic owners)
+// When no tenant → show the Healibrate product page (for clinic owners)
 
 function ConditionalHome() {
   const { hasTenant, loading } = useClinic();
@@ -72,7 +73,7 @@ function ConditionalHome() {
     );
   }
 
-  return hasTenant ? <ClinicLanding /> : <MedibookProductPage />;
+  return hasTenant ? <ClinicLanding /> : <HealibrateProductPage />;
 }
 
 export default function App() {
@@ -85,7 +86,7 @@ export default function App() {
             {/* ── Home: conditional based on tenant ──────────── */}
             <Route path="/" element={<ConditionalHome />} />
 
-            {/* ── Medibook platform routes (always accessible) ─ */}
+            {/* ── Healibrate platform routes (always accessible) ─ */}
             <Route path="/pricing"            element={<PricingPage />} />
             <Route path="/about"              element={<AboutPage />} />
             <Route path="/contact"            element={<ContactPage />} />
@@ -113,6 +114,7 @@ export default function App() {
             <Route path="/admin/appointments" element={<AdminRoute><AdminAppointments /></AdminRoute>} />
             <Route path="/admin/doctors/create" element={<AdminRoute><AdminDoctors /></AdminRoute>} />
             <Route path="/admin/branding"     element={<AdminRoute><BrandingSettings /></AdminRoute>} />
+            <Route path="/admin/billing"      element={<AdminRoute><BillingPage /></AdminRoute>} />
 
             {/* ── Fallback ─────────────────────────────────── */}
             <Route path="*" element={<Navigate to="/" replace />} />

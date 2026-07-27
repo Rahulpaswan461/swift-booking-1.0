@@ -35,7 +35,7 @@ export const sendFounderDigest = async () => {
 
     const html = `
       <div style="font-family:-apple-system, Segoe UI, Roboto, sans-serif; max-width:600px; margin:auto;">
-        <h2 style="margin:0 0 4px 0;">MediBook weekly digest</h2>
+        <h2 style="margin:0 0 4px 0;">Healibrate weekly digest</h2>
         <p style="margin:0 0 20px 0; color:#6b7280; font-size:13px;">${m.date} · Early Access</p>
 
         <table style="width:100%; border-collapse:collapse; border-bottom:1px solid #eee; margin-bottom:20px;">
@@ -65,13 +65,13 @@ export const sendFounderDigest = async () => {
         </table>` : ""}
 
         <p style="margin-top:24px; font-size:12px; color:#9ca3af;">
-          Full live dashboard: your /internal/metrics page. Automated by MediBook.
+          Full live dashboard: your /internal/metrics page. Automated by Healibrate.
         </p>
       </div>`
 
     await sendPlainEmail({
       to: FOUNDER_INBOX,
-      subject: `MediBook weekly: ${t.active_clinics_7d} active clinics, ${t.bookings_7d} bookings, ${t.upgrade_ready_clinics} upgrade-ready`,
+      subject: `Healibrate weekly: ${t.active_clinics_7d} active clinics, ${t.bookings_7d} bookings, ${t.upgrade_ready_clinics} upgrade-ready`,
       html,
     })
 

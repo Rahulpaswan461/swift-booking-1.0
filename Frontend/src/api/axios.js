@@ -48,6 +48,15 @@ adminApi.interceptors.response.use(res => res, err => {
     localStorage.removeItem('admin_token')
     localStorage.removeItem('admin')
     window.location.href = '/admin/login'
+    return Promise.reject(err)
+  }
+  // Unpaid clinic: send the admin to the billing page to pick a plan.
+  // Keep them logged in (don't clear the token) so they can pay. Never
+  // redirect while already on billing, to avoid a loop.
+  if (err.response?.status === 403 && err.response.data?.subscription_required) {
+    if (!window.location.pathname.startsWith('/admin/billing')) {
+      window.location.href = '/admin/billing'
+    }
   }
   return Promise.reject(err)
 })

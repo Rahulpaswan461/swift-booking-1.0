@@ -1,10 +1,10 @@
 // Env-aware clinic URL builder.
 // Dev:  APP_BASE_DOMAIN=localhost:3000  → http://{slug}.localhost:3000
-// Prod: APP_BASE_DOMAIN=medibook.in     → https://{slug}.medibook.in
+// Prod: APP_BASE_DOMAIN=healibrate.in     → https://{slug}.healibrate.in
 // Never hardcode the domain elsewhere — always build URLs through this.
 
 function baseDomain() {
-  return process.env.APP_BASE_DOMAIN || "medibook.in"
+  return process.env.APP_BASE_DOMAIN || "healibrate.in"
 }
 
 function protocol() {
