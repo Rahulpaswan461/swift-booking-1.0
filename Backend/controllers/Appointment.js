@@ -2,7 +2,10 @@ import supabase from "../config/supabase.js"
 import { sendBookingConfirmationEmail, sendRescheduleConfirmationEmail, sendCancellationEmail } from "../services/emailService.js"
 import { logAppointmentEvent } from "../utils/appointmentEvents.js"
 import { sendBookingConfirmationSms } from "../services/smsService.js"
+import createLogger from "../utils/logger.js"
 import crypto from "crypto"
+
+const log = createLogger("appointments")
 
 export const bookAppointment = async (req, res) => {
     try {
@@ -120,6 +123,14 @@ export const bookAppointment = async (req, res) => {
             time: appointment_time,
         })
 
+        log.info("Appointment booked", {
+            appointmentId: appointment.id,
+            clinicId,
+            doctorId: doctor_id,
+            date: appointment_date,
+            time: appointment_time,
+        })
+
         // Send confirmation in the background via the channel the patient
         // verified with — email → email, phone → SMS (both when possible)
         if (patient?.email) {
@@ -128,14 +139,14 @@ export const bookAppointment = async (req, res) => {
                 patient,
                 doctor,
                 clinic: req.tenant
-            }).catch(err => console.error("Email failed:", err.message))
+            }).catch(err => log.error("Booking confirmation email FAILED", { appointmentId: appointment.id, clinicId, error: err.message, code: err.code }))
         }
         if (req.patient?.contact_type === 'phone' && (patient?.phone || phone)) {
             sendBookingConfirmationSms({
                 appointment: { ...appointment, patient_phone: patient?.phone || phone },
                 doctor,
                 clinic: req.tenant
-            }).catch(err => console.error("SMS failed:", err.message))
+            }).catch(err => log.error("Booking confirmation SMS FAILED", { appointmentId: appointment.id, clinicId, error: err.message }))
         }
 
         return res.status(201).json({
@@ -144,7 +155,7 @@ export const bookAppointment = async (req, res) => {
             data: appointment
         })
     } catch (error) {
-        console.error('Error booking appointment:', error)
+        log.error('Error booking appointment', { clinicId: req.tenant?.id, error: error.message })
         return res.status(500).json({
             success: false,
             message: 'Internal server error'
@@ -432,6 +443,16 @@ export const rescheduleAppointment = async (req, res) => {
                 message: 'Failed to reschedule appointment'
             })
         }
+
+        // Reset the reminder flag so the patient gets a fresh day-before
+        // reminder for the NEW date. Best-effort: if migration 009's
+        // reminder_sent column isn't present, ignore rather than fail the
+        // reschedule.
+        await supabase
+            .from('appointments')
+            .update({ reminder_sent: false })
+            .eq('id', id)
+            .then(r => r, () => {})
 
         logAppointmentEvent(appointment.id, appointment.clinic_id, "rescheduled", {
             from_date: appointment.appointment_date,

@@ -43,14 +43,14 @@ export function ClinicProvider({ children }) {
 
   // Derived values
   const branding = clinic?.branding || {};
-  const clinicName = branding.clinic_name || clinic?.name || 'MediBook';
+  const clinicName = branding.clinic_name || clinic?.name || 'Healibrate';
   const logoUrl = branding.logo_url;
 
   // Browser tab title reflects the clinic patients are visiting
   useEffect(() => {
     document.title = clinic
       ? `${clinicName} — Book an appointment`
-      : 'MediBook — Clinic appointment platform';
+      : 'Healibrate — Clinic appointment platform';
   }, [clinic, clinicName]);
   const primaryColor = branding.primary_color || '#0171be';
   const tagline = branding.tagline || '';

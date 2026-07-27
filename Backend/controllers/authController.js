@@ -3,6 +3,21 @@ import jwt from "jsonwebtoken"
 import crypto from "crypto"
 import { sendOtpEmail } from "../services/emailService.js"
 import { sendOtpSms } from "../services/smsService.js"
+import createLogger from "../utils/logger.js"
+
+const log = createLogger("auth-otp")
+
+// Mask a contact for logs — enough to identify in support, not full PII.
+// "rahul@gmail.com" → "ra***@gmail.com" ; "9898989898" → "******9898"
+function maskContact(value = "", type = "email") {
+  const v = String(value)
+  if (type === "email") {
+    const [name, domain] = v.split("@")
+    if (!domain) return "***"
+    return `${name.slice(0, 2)}***@${domain}`
+  }
+  return v.length > 4 ? `${"*".repeat(v.length - 4)}${v.slice(-4)}` : "***"
+}
 
 // Generate a 6-digit OTP
 function generateOtp() {
@@ -85,14 +100,15 @@ export const requestOtp = async (req, res) => {
     // Send OTP via the chosen channel — in the background. Gmail SMTP can
     // take 5-15s (worse under throttling); the OTP is already stored, so
     // respond immediately and let delivery finish on its own.
+    const masked = maskContact(contact_value, contact_type)
+    log.info("OTP requested", { contact_type, contact: masked, clinicId })
+
     if (contact_type === "email") {
-      sendOtpEmail({ email: contact_value, otp, clinic: req.tenant, ttlSeconds: OTP_TTL_SECONDS })
-        .then(() => console.log(`OTP email delivered to ${contact_value}`))
-        .catch((err) => console.error("OTP email failed:", err.message))
+      // Delivery outcome (sent/failed) is logged by the email service.
+      sendOtpEmail({ email: contact_value, otp, clinic: req.tenant, ttlSeconds: OTP_TTL_SECONDS }).catch(() => {})
     } else {
-      sendOtpSms({ phone: contact_value, otp, clinic: req.tenant, ttlSeconds: OTP_TTL_SECONDS }).catch((err) =>
-        console.error("OTP SMS failed:", err.message)
-      )
+      sendOtpSms({ phone: contact_value, otp, clinic: req.tenant, ttlSeconds: OTP_TTL_SECONDS })
+        .catch((err) => log.error("OTP SMS dispatch FAILED", { contact: masked, clinicId, error: err.message }))
     }
 
     return res.status(200).json({
@@ -100,7 +116,7 @@ export const requestOtp = async (req, res) => {
       message: `OTP sent to ${contact_type}.`,
     })
   } catch (error) {
-    console.error("requestOtp error:", error)
+    log.error("requestOtp error", { error: error.message })
     return res.status(500).json({
       success: false,
       message: "Internal server error.",
@@ -134,7 +150,10 @@ export const verifyOtp = async (req, res) => {
       .limit(1)
       .single()
 
+    const masked = maskContact(contact_value, contact_type)
+
     if (fetchError || !record) {
+      log.warn("OTP verify failed — none found", { contact_type, contact: masked })
       return res.status(400).json({
         success: false,
         message: "No OTP found. Request one first.",
@@ -144,6 +163,7 @@ export const verifyOtp = async (req, res) => {
     // Check expiry
     if (new Date(record.expires_at) < new Date()) {
       await supabase.from("otp_verifications").delete().eq("id", record.id)
+      log.warn("OTP verify failed — expired", { contact_type, contact: masked })
       return res.status(400).json({
         success: false,
         message: "OTP has expired. Request a new one.",
@@ -153,6 +173,7 @@ export const verifyOtp = async (req, res) => {
     // Check OTP hash match
     const inputHash = hashOtp(otp_code)
     if (record.otp_hash !== inputHash) {
+      log.warn("OTP verify failed — wrong code", { contact_type, contact: masked })
       return res.status(400).json({
         success: false,
         message: "Invalid OTP.",

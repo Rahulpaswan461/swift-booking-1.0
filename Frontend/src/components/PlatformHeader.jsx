@@ -8,7 +8,7 @@ const LINKS = [
 ]
 
 /**
- * One shared header for every MediBook platform page (home, pricing,
+ * One shared header for every Healibrate platform page (home, pricing,
  * about, contact) — same links everywhere, current page highlighted,
  * logo always returns home.
  */
@@ -43,7 +43,7 @@ export default function PlatformHeader() {
             onClick={() => navigate('/admin/register')}
             className="rounded-full bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700"
           >
-            Start Free
+            Get Started
           </button>
         </nav>
       </div>

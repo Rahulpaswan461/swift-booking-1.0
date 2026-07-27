@@ -75,7 +75,7 @@ export default function PlatformMetrics() {
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="font-display text-3xl font-semibold text-ink-900">Platform metrics</h1>
-            <p className="mt-1 text-sm text-gray-400">Generated {new Date(data.generated_at).toLocaleString()} · Early Access</p>
+            <p className="mt-1 text-sm text-gray-400">Generated {new Date(data.generated_at).toLocaleString()}</p>
           </div>
           <button onClick={() => load(key)} className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-surface-100">
             Refresh

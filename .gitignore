@@ -8,3 +8,4 @@ migrations
 MIGRATION_COMPLETE.md
 SUPABASE_SETUP.md
 CLAUDE.md
+.env.backup-email-debug

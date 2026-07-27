@@ -283,7 +283,7 @@ export const getDoctorPatients = async (req, res) => {
             .select(`
                 id, patient_id, appointment_date, appointment_time, status, notes,
                 patients (id, name, email, phone),
-                session_notes (notes, diagnosis, prescription, follow_up_date, updated_at)
+                session_notes (*)
             `)
             .eq('doctor_id', doctorId)
             .eq('clinic_id', clinicId)
@@ -320,26 +320,31 @@ export const getDoctorPatients = async (req, res) => {
                             diagnosis: sessionNote.diagnosis,
                             prescription: sessionNote.prescription,
                             follow_up_date: sessionNote.follow_up_date,
+                            tags: sessionNote.tags || [],
                         }
                         : null,
+                    visit_tags: [],
                 }
                 byPatient.set(appt.patient_id, entry)
             }
             entry.total_appointments += 1
             if (appt.status === 'completed') entry.completed_sessions += 1
             if (appt.status === 'confirmed') entry.upcoming += 1
+            const apptNote = Array.isArray(appt.session_notes) ? appt.session_notes[0] : appt.session_notes
             // Latest appointment may have no notes yet — fall back to the
             // most recent one that does
-            if (!entry.last_notes) {
-                const sessionNote = Array.isArray(appt.session_notes) ? appt.session_notes[0] : appt.session_notes
-                if (sessionNote) {
-                    entry.last_notes = {
-                        notes: sessionNote.notes,
-                        diagnosis: sessionNote.diagnosis,
-                        prescription: sessionNote.prescription,
-                        follow_up_date: sessionNote.follow_up_date,
-                    }
+            if (!entry.last_notes && apptNote) {
+                entry.last_notes = {
+                    notes: apptNote.notes,
+                    diagnosis: apptNote.diagnosis,
+                    prescription: apptNote.prescription,
+                    follow_up_date: apptNote.follow_up_date,
+                    tags: apptNote.tags || [],
                 }
+            }
+            // Patient summary: aggregate visit tags across all their notes
+            for (const tag of apptNote?.tags || []) {
+                if (!entry.visit_tags.includes(tag)) entry.visit_tags.push(tag)
             }
         }
 

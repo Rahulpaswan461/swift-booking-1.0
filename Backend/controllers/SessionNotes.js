@@ -10,13 +10,25 @@ export const createSessionNotes = async (req, res) => {
         const doctorId = req.doctor.id
         const clinicId = req.doctor.clinic_id
         const { appointment_id } = req.params
-        const { notes, diagnosis, prescription, follow_up_date } = req.body
+        const { notes, diagnosis, prescription, follow_up_date, tags } = req.body
 
         if (!notes || !notes.trim()) {
             return res.status(400).json({
                 success: false,
                 message: 'Session notes are required'
             })
+        }
+
+        // Visit tags: up to 6 short labels, trimmed and deduplicated
+        let cleanTags
+        if (tags !== undefined) {
+            if (!Array.isArray(tags)) {
+                return res.status(400).json({ success: false, message: 'tags must be an array of short labels' })
+            }
+            cleanTags = [...new Set(tags.map(t => String(t).trim()).filter(Boolean))].slice(0, 6)
+            if (cleanTags.some(t => t.length > 30)) {
+                return res.status(400).json({ success: false, message: 'Each tag must be 30 characters or fewer' })
+            }
         }
 
         // Verify appointment belongs to this doctor and clinic
@@ -48,22 +60,34 @@ export const createSessionNotes = async (req, res) => {
         }
 
         // Upsert session notes (insert or update)
-        const { data: sessionNote, error: noteError } = await supabase
+        const noteData = {
+            appointment_id,
+            doctor_id: doctorId,
+            clinic_id: clinicId,
+            notes: notes.trim(),
+            diagnosis: diagnosis ? diagnosis.trim() : null,
+            prescription: prescription ? prescription.trim() : null,
+            follow_up_date: follow_up_date || null,
+            updated_at: new Date().toISOString()
+        }
+        if (cleanTags !== undefined) noteData.tags = cleanTags
+
+        let { data: sessionNote, error: noteError } = await supabase
             .from('session_notes')
-            .upsert({
-                appointment_id,
-                doctor_id: doctorId,
-                clinic_id: clinicId,
-                notes: notes.trim(),
-                diagnosis: diagnosis ? diagnosis.trim() : null,
-                prescription: prescription ? prescription.trim() : null,
-                follow_up_date: follow_up_date || null,
-                updated_at: new Date().toISOString()
-            }, {
-                onConflict: 'appointment_id'
-            })
+            .upsert(noteData, { onConflict: 'appointment_id' })
             .select()
             .single()
+
+        // Pre-migration-011 schema has no tags column — retry without
+        if (noteError && cleanTags !== undefined && /tags/i.test(noteError.message || '')) {
+            console.warn('session_notes.tags column missing — run migration 011. Saving without tags.')
+            delete noteData.tags
+            ;({ data: sessionNote, error: noteError } = await supabase
+                .from('session_notes')
+                .upsert(noteData, { onConflict: 'appointment_id' })
+                .select()
+                .single())
+        }
 
         if (noteError) {
             console.error('createSessionNotes error:', noteError)
@@ -153,12 +177,22 @@ export const getPatientHistory = async (req, res) => {
             })
         }
 
-        const { data: appointments, error } = await supabase
+        // Never run the history query without a resolved clinic — otherwise the
+        // clinic_id filter would be `undefined` and the results would not be
+        // scoped to a single clinic. Patients must reach this via their clinic.
+        if (!clinicId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Open this clinic through its own link to see your appointments.'
+            })
+        }
+
+        const { data: rawAppointments, error } = await supabase
             .from('appointments')
             .select(`
                 *,
                 doctor:doctors(id, full_name, specialization, qualification),
-                session_notes(session_notes:id, notes, diagnosis, prescription, follow_up_date)
+                session_notes(*)
             `)
             .eq('patient_id', patientId)
             .eq('clinic_id', clinicId)
@@ -172,6 +206,12 @@ export const getPatientHistory = async (req, res) => {
                 message: 'Internal server error'
             })
         }
+
+        // Preserve the legacy shape the UI reads ({ session_notes: <id>, ... })
+        const appointments = (rawAppointments || []).map(a => {
+            const rawNote = Array.isArray(a.session_notes) ? a.session_notes[0] : a.session_notes
+            return { ...a, session_notes: rawNote ? { ...rawNote, session_notes: rawNote.id } : null }
+        })
 
         // Separate upcoming and past appointments
         const today = new Date().toISOString().split('T')[0]
@@ -218,7 +258,7 @@ export const getPatientHistoryWithNotes = async (req, res) => {
             .select(`
                 *,
                 patient:patients(id, name, email, phone, date_of_birth),
-                session_notes(session_notes:id, notes, diagnosis, prescription, follow_up_date, created_at, updated_at)
+                session_notes(*)
             `)
             .eq('patient_id', patient_id)
             .eq('clinic_id', clinicId)
@@ -235,10 +275,20 @@ export const getPatientHistoryWithNotes = async (req, res) => {
 
         // Lifecycle trail (booked / rescheduled / cancelled / completed)
         const eventsByAppointment = await getAppointmentEvents(appointments.map(a => a.id))
-        const withEvents = appointments.map(a => ({
-            ...a,
-            events: eventsByAppointment[a.id] || [],
-        }))
+        const withEvents = appointments.map(a => {
+            // Preserve the legacy shape the UI reads ({ session_notes: <id>, ... })
+            const rawNote = Array.isArray(a.session_notes) ? a.session_notes[0] : a.session_notes
+            return {
+                ...a,
+                session_notes: rawNote ? { ...rawNote, session_notes: rawNote.id } : null,
+                events: eventsByAppointment[a.id] || [],
+            }
+        })
+
+        // Patient summary: visit reasons aggregated from tags across all notes
+        const visitTags = [...new Set(
+            withEvents.flatMap(a => a.session_notes?.tags || [])
+        )]
 
         const completed = appointments.filter(a => a.status === 'completed').length
         const cancelled = appointments.filter(a => a.status === 'cancelled').length
@@ -253,6 +303,7 @@ export const getPatientHistoryWithNotes = async (req, res) => {
                     completed,
                     cancelled,
                     no_show: noShow,
+                    visit_tags: visitTags,
                 },
                 appointments: withEvents,
                 total: appointments.length

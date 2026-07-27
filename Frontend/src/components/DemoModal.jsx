@@ -162,10 +162,10 @@ function WalkthroughSection({ onTryDemo }) {
           Live Demo
         </div>
         <h3 className="font-display text-2xl font-semibold text-ink-900">
-          See MediBook in Action
+          See Healibrate in Action
         </h3>
         <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
-          Explore how a real clinic runs on MediBook — from patient bookings to admin dashboard.
+          Explore how a real clinic runs on Healibrate — from patient bookings to admin dashboard.
         </p>
       </div>
 
@@ -277,7 +277,7 @@ function WalkthroughSection({ onTryDemo }) {
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <path d="M8 2L2 7l9 5 9-5-9-5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
           </svg>
-          Start Free
+          Get Started
         </button>
       </div>
     </div>
@@ -866,7 +866,7 @@ export default function DemoModal({ isOpen, onClose }) {
             </div>
             <div>
               <h3 className="font-semibold text-sm text-ink-900">
-                {showDemo ? 'Interactive Demo' : 'MediBook Demo'}
+                {showDemo ? 'Interactive Demo' : 'Healibrate Demo'}
               </h3>
               <p className="text-[10px] text-gray-400">
                 {showDemo ? 'Try the booking flow live' : 'See how it works'}

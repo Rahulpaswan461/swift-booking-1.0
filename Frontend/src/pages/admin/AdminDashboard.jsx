@@ -62,13 +62,6 @@ export default function AdminDashboard() {
     })
   }
 
-  const trialDaysRemaining = () => {
-    const trialEndsAt = clinic?.trial_ends_at || clinic?.trialEndsAt
-    if (!trialEndsAt) return null
-    const days = Math.ceil((new Date(trialEndsAt) - new Date()) / (1000 * 60 * 60 * 24))
-    return days > 0 ? days : 0
-  }
-
   if (loading) return (
     <div className="flex min-h-screen bg-surface-50">
       <AdminSidebar />
@@ -88,11 +81,22 @@ export default function AdminDashboard() {
 
       <main className="flex-1 p-8 overflow-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="font-display text-3xl font-semibold text-ink-900">{clinic?.name || 'Overview'}</h1>
-          <p className="text-gray-500 text-sm mt-0.5">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="font-display text-3xl font-semibold text-ink-900">{clinic?.name || 'Overview'}</h1>
+            <p className="text-gray-500 text-sm mt-0.5">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </p>
+          </div>
+          {clinic?.entitlements && (
+            <a href="/admin/billing"
+              className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-600 transition hover:border-brand-300 hover:text-brand-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+              {clinic.entitlements.plan_label} plan
+              <span className="text-gray-300">·</span>
+              <span className="text-brand-600">Manage</span>
+            </a>
+          )}
         </div>
 
         {/* Your Booking Page card */}
@@ -128,34 +132,6 @@ export default function AdminDashboard() {
                   </>
                 )}
               </button>
-            </div>
-          </div>
-        )}
-
-        {clinic?.early_access ? (
-          <div className="mb-6 flex items-center gap-3 rounded-2xl border border-green-200 bg-green-50 px-4 py-3">
-            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-green-100">
-              <svg width="15" height="15" viewBox="0 0 14 14" fill="none">
-                <path d="M7 1l1.8 3.6L13 5.2l-3 2.9.7 4L7 10.2 3.3 12.1l.7-4-3-2.9 4.2-.6L7 1z" stroke="#15803d" strokeWidth="1.3" strokeLinejoin="round" />
-              </svg>
-            </span>
-            <p className="text-sm text-green-800">
-              <span className="font-bold">Early Access — everything is free.</span>{' '}
-              Full access, no limits, no card required.
-              Paid plans arrive later and you'll be notified well in advance.
-            </p>
-          </div>
-        ) : trialDaysRemaining() !== null && (
-          <div className="mb-6">
-            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold
-              ${trialDaysRemaining() > 0 && trialDaysRemaining() <= 3
-                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                : trialDaysRemaining() > 0
-                  ? 'bg-green-50 text-green-700 border border-green-200'
-                  : 'bg-red-50 text-red-700 border border-red-200'}`}>
-              {trialDaysRemaining() > 0
-                ? `Free trial — ${trialDaysRemaining()} day${trialDaysRemaining() > 1 ? 's' : ''} remaining`
-                : 'Trial expired — upgrade to continue'}
             </div>
           </div>
         )}

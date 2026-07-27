@@ -15,8 +15,7 @@ const seedClinic = async () => {
         specialization: 'General',
         owner_email: process.env.ADMIN_EMAIL || 'admin@example.com',
         is_active: true,
-        subscription_plan: 'free',
-        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        subscription_plan: 'pro',
       })
       .select()
       .single()
@@ -136,16 +135,15 @@ const seedClinic = async () => {
         .from('subscriptions')
         .insert({
           clinic_id: activeClinic.id,
-          plan: 'free',
-          status: 'trialing',
+          plan: 'pro',
+          status: 'active',
           started_at: new Date().toISOString(),
-          ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
         })
 
       if (subError) {
         console.log('⚠️  Could not create subscription:', subError.message)
       } else {
-        console.log('✅ Free trial subscription created (14 days)')
+        console.log('✅ Active Pro subscription created')
       }
     } else {
       console.log('✅ Subscription already exists')

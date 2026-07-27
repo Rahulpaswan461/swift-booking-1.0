@@ -40,7 +40,7 @@ export default function SupportModal({ onClose }) {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="font-display text-lg font-semibold text-gray-900">Help & support</h2>
-            <p className="text-xs text-gray-400">We usually reply within a day — Early Access clinics get priority.</p>
+            <p className="text-xs text-gray-400">We usually reply within a day — often much faster.</p>
           </div>
           <button onClick={onClose} className="text-gray-400 transition hover:text-gray-600">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -84,7 +84,7 @@ export default function SupportModal({ onClose }) {
             {error && <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</div>}
             <button type="submit" disabled={sending}
               className="w-full rounded-xl bg-brand-600 py-2.5 text-sm font-bold text-white transition hover:bg-brand-700 disabled:opacity-60">
-              {sending ? 'Sending…' : 'Send to MediBook support'}
+              {sending ? 'Sending…' : 'Send to Healibrate support'}
             </button>
           </form>
         )}

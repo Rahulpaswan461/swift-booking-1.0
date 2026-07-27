@@ -54,7 +54,7 @@ export const submitSupportRequest = async (req, res) => {
     if (SUPPORT_INBOX) {
       sendPlainEmail({
         to: SUPPORT_INBOX,
-        subject: `[MediBook support] ${record.subject}`,
+        subject: `[Healibrate support] ${record.subject}`,
         html: `
           <div style="font-family:sans-serif; max-width:560px;">
             <h2 style="margin:0 0 12px 0;">New support request</h2>

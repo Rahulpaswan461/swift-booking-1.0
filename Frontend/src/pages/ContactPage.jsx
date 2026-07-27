@@ -46,7 +46,7 @@ export default function ContactPage() {
                   <path d="M2 4.5l6 4.5 6-4.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </span>
-              support@medibook.in
+              support@healibrate.in
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-600">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 border border-brand-100">
@@ -55,7 +55,7 @@ export default function ContactPage() {
                   <path d="M8 4.5V8l2.5 1.5" strokeLinecap="round" />
                 </svg>
               </span>
-              Replies within 24 hours — Early Access clinics get priority
+              Replies within 24 hours, usually much faster
             </div>
           </div>
         </div>

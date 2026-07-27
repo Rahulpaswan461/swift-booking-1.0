@@ -1,7 +1,7 @@
 import supabase from "../config/supabase.js";
 
 // Reserved subdomains that should NOT be treated as clinic slugs
-const RESERVED = new Set(["www", "medibook", "api", "admin", "app", "portal"]);
+const RESERVED = new Set(["www", "healibrate", "api", "admin", "app", "portal"]);
 
 // Simple in-memory cache for tenant lookups (avoids DB hit on every request)
 const TENANT_CACHE = new Map();
@@ -52,14 +52,25 @@ async function resolveTenantFromSubdomain(subdomain) {
  * and looks up the matching active clinic.
  * Attaches `req.tenant` with the clinic object.
  *
- * A bare domain (localhost:5173, medibook.in) is the PLATFORM homepage,
+ * A bare domain (localhost:5173, healibrate.in) is the PLATFORM homepage,
  * never a clinic: req.tenant stays null and downstream controllers reject
  * clinic-scoped operations. Clinics are only reachable via their slug
- * subdomain ({slug}.localhost:5173 in dev, {slug}.medibook.in in prod).
+ * subdomain ({slug}.localhost:5173 in dev, {slug}.healibrate.in in prod).
  */
+/**
+ * The public host the patient actually visited. Behind a proxy (Vercel
+ * rewrites → Render), req.headers.host is the BACKEND's host — the real
+ * clinic subdomain arrives in x-forwarded-host.
+ */
+export function requestHost(req) {
+  const forwarded = req.headers["x-forwarded-host"];
+  const host = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(",")[0]?.trim() || req.headers.host || "";
+  return host;
+}
+
 export const resolveTenant = async (req, res, next) => {
   try {
-    const host = req.headers.host || "";
+    const host = requestHost(req);
     const parts = host.split(".");
     const subdomain = parts[0]?.toLowerCase();
 
@@ -104,7 +115,7 @@ export const resolveTenant = async (req, res, next) => {
  */
 export const resolveTenantOptional = async (req, res, next) => {
   try {
-    const host = req.headers.host || "";
+    const host = requestHost(req);
     const parts = host.split(".");
     const subdomain = parts[0]?.toLowerCase();
 
@@ -135,7 +146,10 @@ export const resolveTenantOptional = async (req, res, next) => {
 // plan limits are suspended. Set BETA_MODE=false when the payment
 // gateway ships to re-enable full enforcement. Clinic deactivation
 // (is_active=false) still works in Early Access.
-export const EARLY_ACCESS = process.env.BETA_MODE !== "false";
+// Re-exported from the plan entitlements config (single source of truth).
+export { EARLY_ACCESS } from "../config/plans.js";
+import { EARLY_ACCESS } from "../config/plans.js";
+import { planConfig } from "../config/plans.js";
 
 // Subscription lookups run on EVERY authenticated request — cache them
 // briefly so each request doesn't pay 2 extra DB roundtrips.
@@ -156,7 +170,7 @@ async function loadClinicSubscription(clinicId) {
   const [{ data: clinic, error }, { data: subscription }] = await Promise.all([
     supabase
       .from("clinics")
-      .select("id, name, subscription_plan, trial_ends_at, is_active")
+      .select("id, name, subscription_plan, is_active")
       .eq("id", clinicId)
       .single(),
     supabase
@@ -164,8 +178,9 @@ async function loadClinicSubscription(clinicId) {
       .select("plan, status, ends_at")
       .eq("clinic_id", clinicId)
       .eq("status", "active")
-      .single()
-      .then((r) => r, () => ({ data: null })),
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .then((r) => ({ data: r.data?.[0] || null }), () => ({ data: null })),
   ]);
 
   const entry = { clinic: error ? null : clinic, subscription: subscription || null, at: Date.now() };
@@ -205,51 +220,34 @@ export const enforceSubscription = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         message: isStaff
-          ? "This clinic is currently inactive. Contact Medibook support."
+          ? "This clinic is currently inactive. Contact Healibrate support."
           : patientBlockedMessage,
       });
     }
 
-    // Early Access: everything below (trial expiry, subscription checks)
-    // is suspended — clinics get full free access.
+    // Early Access: subscription checks are suspended — clinics get full
+    // free access while the platform is in beta.
     if (EARLY_ACCESS) {
       req.subscription = subscription;
       req.clinicPlan = "early_access";
       return next();
     }
 
-    // Check trial expiration for free plan
-    if (
-      clinic.subscription_plan === "free" &&
-      clinic.trial_ends_at &&
-      new Date(clinic.trial_ends_at) < new Date()
-    ) {
+    // Paid-from-signup: an active subscription is required. There is no
+    // free plan and no trial — a clinic must pick and pay for a plan
+    // before the portal or its public booking page work.
+    if (!subscription) {
       return res.status(403).json({
         success: false,
         message: isStaff
-          ? "Your free trial has expired. Upgrade to a paid plan to continue."
+          ? "Choose a plan to activate your clinic and continue."
           : patientBlockedMessage,
-        trial_expired: true,
+        subscription_required: true,
       });
     }
 
-    // Check active subscription for all plans (loaded alongside the clinic)
-    if (!subscription) {
-      // No active subscription and trial expired → blocked
-      if (
-        clinic.trial_ends_at &&
-        new Date(clinic.trial_ends_at) < new Date()
-      ) {
-        return res.status(403).json({
-          success: false,
-          message: isStaff
-            ? "No active subscription. Upgrade to continue using the platform."
-            : patientBlockedMessage,
-          subscription_required: true,
-        });
-      }
-    } else if (subscription.ends_at && new Date(subscription.ends_at) < new Date()) {
-      // Subscription expired
+    // Active subscription that has passed its end date → expired.
+    if (subscription.ends_at && new Date(subscription.ends_at) < new Date()) {
       return res.status(403).json({
         success: false,
         message: isStaff
@@ -259,9 +257,10 @@ export const enforceSubscription = async (req, res, next) => {
       });
     }
 
-    // Attach subscription info for downstream use
+    // Attach subscription info for downstream use. The subscription row is
+    // the source of truth for which plan's limits/features apply.
     req.subscription = subscription;
-    req.clinicPlan = clinic.subscription_plan;
+    req.clinicPlan = subscription.plan;
 
     next();
   } catch (err) {
@@ -281,16 +280,9 @@ export const enforceSubscription = async (req, res, next) => {
  * be blocked by the appointment quota and booking an appointment must
  * not be blocked by the doctor quota.
  *
- * Free plan: 1 doctor, 50 appointments/month
- * Pro plan: 5 doctors, unlimited appointments
- * Enterprise: unlimited everything
+ * Limits come from config/plans.js — the single source of truth for
+ * what each plan (Basic ₹99 / Growth ₹299 / Pro ₹499) includes.
  */
-const PLAN_LIMITS = {
-  free: { maxDoctors: 1, maxAppointmentsPerMonth: 50 },
-  pro: { maxDoctors: 5, maxAppointmentsPerMonth: Infinity },
-  enterprise: { maxDoctors: Infinity, maxAppointmentsPerMonth: Infinity },
-};
-
 export const enforcePlanLimits = (resource) => async (req, res, next) => {
   try {
     // Early Access: no plan limits while the platform is free
@@ -304,7 +296,6 @@ export const enforcePlanLimits = (resource) => async (req, res, next) => {
     }
 
     const clinicId = req.tenant?.id || req.admin?.clinic_id || req.doctor?.clinic_id;
-    const plan = req.clinicPlan || "free";
 
     if (!clinicId) {
       return res.status(400).json({
@@ -313,9 +304,10 @@ export const enforcePlanLimits = (resource) => async (req, res, next) => {
       });
     }
 
-    const { maxDoctors, maxAppointmentsPerMonth } = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
+    const config = planConfig(req.clinicPlan);
+    const { maxDoctors } = config;
 
-    if (resource === "doctors") {
+    if (resource === "doctors" && maxDoctors !== Infinity) {
       const { count: doctorCount } = await supabase
         .from("doctors")
         .select("*", { count: "exact", head: true })
@@ -325,33 +317,9 @@ export const enforcePlanLimits = (resource) => async (req, res, next) => {
       if (doctorCount >= maxDoctors) {
         return res.status(403).json({
           success: false,
-          message: `Your ${plan} plan allows up to ${maxDoctors} doctor(s). Upgrade to add more.`,
+          message: `Your ${config.label} plan includes up to ${maxDoctors} doctor(s). Upgrade to add more.`,
           plan_limit_exceeded: true,
           limit: "doctors",
-        });
-      }
-    }
-
-    if (resource === "appointments") {
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
-
-      const { count: appointmentCount } = await supabase
-        .from("appointments")
-        .select("*", { count: "exact", head: true })
-        .eq("clinic_id", clinicId)
-        .gte("created_at", startOfMonth)
-        .lte("created_at", endOfMonth);
-
-      if (appointmentCount >= maxAppointmentsPerMonth) {
-        // This limit surfaces on the PATIENT booking flow — never mention
-        // the clinic's billing/plan to patients.
-        return res.status(403).json({
-          success: false,
-          message: "This clinic can't accept new online bookings right now. Please contact the clinic directly.",
-          plan_limit_exceeded: true,
-          limit: "appointments",
         });
       }
     }

@@ -5,6 +5,7 @@ import { registerClinic, resolveClinic, updateBranding, getMyClinic, updateClini
 import { createDoctorForClinic, listDoctorsForClinic, updateDoctorForClinic } from "../controllers/doctorManagement.js"
 import { protectAdmin } from "../middleware/auth.js"
 import { reminderHandler } from "../services/reminder.js"
+import { createCheckout, verifySubscription } from "../controllers/billingController.js"
 import { enforceSubscription, enforcePlanLimits } from "../middleware/tenant.js"
 
 const adminRouter = express.Router()
@@ -51,5 +52,12 @@ adminRouter.patch("/clinic/settings", protectAdmin, enforceSubscription, updateC
 
 // Manually trigger tomorrow's reminders (for testing / external schedulers)
 adminRouter.post("/reminders/run", protectAdmin, reminderHandler)
+
+// Billing: start a subscription checkout (Dodo Payments).
+// NOT behind enforceSubscription — an unpaid admin must be able to pay.
+adminRouter.post("/billing/checkout", protectAdmin, createCheckout)
+
+// Billing: confirm a checkout on return from Dodo and activate the plan.
+adminRouter.post("/billing/verify", protectAdmin, verifySubscription)
 
 export default adminRouter

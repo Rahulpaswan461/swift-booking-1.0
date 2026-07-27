@@ -110,7 +110,7 @@ export const demoClinicInfo = {
 
 export const demoAdminUser = {
   name: 'Dr. Admin',
-  email: 'demo@medibook.com',
+  email: 'demo@healibrate.com',
   role: 'Clinic Admin',
 };
 
@@ -145,7 +145,7 @@ export const demoTestimonials = [
   {
     name: 'Dr. Rajesh Kumar',
     clinic: 'MediCare Hospital, Delhi',
-    text: 'We moved from WhatsApp scheduling to MediBook in one day. Patient no-shows dropped by 40%.',
+    text: 'We moved from WhatsApp scheduling to Healibrate in one day. Patient no-shows dropped by 40%.',
   },
   {
     name: 'Priya Menon',

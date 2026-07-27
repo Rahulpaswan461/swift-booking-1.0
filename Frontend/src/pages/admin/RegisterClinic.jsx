@@ -31,10 +31,10 @@ export default function RegisterClinic() {
         clinic_id: res.data.clinic.id,
         clinicName: res.data.clinic.name,
         clinicSlug: res.data.clinic.slug,
-        trialEndsAt: res.data.clinic.trial_ends_at
       }))
 
-      navigate('/admin/dashboard', { replace: true })
+      // New clinics have no plan yet — go straight to billing to choose one.
+      navigate('/admin/billing', { replace: true })
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.')
     } finally {
@@ -66,11 +66,11 @@ export default function RegisterClinic() {
             <p className="text-gray-500 text-center text-sm mb-4">
               Get your own booking page in minutes
             </p>
-            <div className="mx-auto mb-8 flex w-fit items-center gap-2 rounded-full border border-green-200 bg-green-50 px-4 py-2 text-xs font-bold text-green-700">
+            <div className="mx-auto mb-8 flex w-fit items-center gap-2 rounded-full border border-brand-100 bg-brand-50 px-4 py-2 text-xs font-bold text-brand-700">
               <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
                 <path d="M7 1l1.8 3.6L13 5.2l-3 2.9.7 4L7 10.2 3.3 12.1l.7-4-3-2.9 4.2-.6L7 1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
               </svg>
-              Free during Early Access — no card required
+              Your booking page, live in minutes
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -148,7 +148,7 @@ export default function RegisterClinic() {
                     </svg>
                     Creating clinic...
                   </>
-                ) : 'Create Clinic & Get Started'}
+                ) : 'Create Clinic & Choose Plan'}
               </button>
             </form>
 

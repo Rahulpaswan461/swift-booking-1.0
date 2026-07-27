@@ -17,7 +17,7 @@ function formatTime(timeStr) {
 }
 
 function AppointmentCard({ appointment, animDelay }) {
-  const notes = appointment.session_notes?.session_notes
+  const notes = appointment.session_notes
   const isCompleted = appointment.status === 'completed'
 
   return (

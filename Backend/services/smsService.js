@@ -71,7 +71,7 @@ export async function sendSms(to, body) {
 // ── Message templates ─────────────────────────────────────────
 
 export async function sendOtpSms({ phone, otp, clinic, ttlSeconds = 30 }) {
-  const clinicName = clinic?.branding?.clinic_name || clinic?.name || "MediBook"
+  const clinicName = clinic?.branding?.clinic_name || clinic?.name || "Healibrate"
   return sendSms(phone, `${otp} is your ${clinicName} verification code. Valid for ${ttlSeconds} seconds.`)
 }
 
@@ -83,6 +83,20 @@ export async function sendBookingConfirmationSms({ appointment, doctor, clinic }
   return sendSms(
     appointment.patient_phone,
     `Appointment confirmed at ${clinicName}: Dr. ${doctor?.full_name} on ${appointment.appointment_date} at ${appointment.appointment_time}.` +
+      (cancelUrl ? ` Manage: ${cancelUrl}` : "")
+  )
+}
+
+// Day-before reminder SMS — so phone-only patients (who never gave an email)
+// still get reminded, mirroring the reminder email.
+export async function sendReminderSms({ appointment, doctor, clinic }) {
+  const clinicName = clinic?.branding?.clinic_name || clinic?.name || "the clinic"
+  const cancelUrl = clinic?.slug
+    ? buildClinicUrl(clinic.slug, `/cancel/${appointment.id}/${appointment.cancel_token}`)
+    : ""
+  return sendSms(
+    appointment.patient_phone,
+    `Reminder: your appointment at ${clinicName} with Dr. ${doctor?.full_name} is tomorrow, ${appointment.appointment_date} at ${appointment.appointment_time}.` +
       (cancelUrl ? ` Manage: ${cancelUrl}` : "")
   )
 }
