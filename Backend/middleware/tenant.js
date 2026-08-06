@@ -52,10 +52,10 @@ async function resolveTenantFromSubdomain(subdomain) {
  * and looks up the matching active clinic.
  * Attaches `req.tenant` with the clinic object.
  *
- * A bare domain (localhost:5173, healibrate.in) is the PLATFORM homepage,
+ * A bare domain (localhost:5173, healibrate.com) is the PLATFORM homepage,
  * never a clinic: req.tenant stays null and downstream controllers reject
  * clinic-scoped operations. Clinics are only reachable via their slug
- * subdomain ({slug}.localhost:5173 in dev, {slug}.healibrate.in in prod).
+ * subdomain ({slug}.localhost:5173 in dev, {slug}.healibrate.com in prod).
  */
 /**
  * The public host the patient actually visited. Behind a proxy (Vercel

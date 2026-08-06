@@ -241,9 +241,14 @@ export const verifyOtp = async (req, res) => {
       patient_id = newPatient.id
     }
 
-    // --- Issue patient JWT (not clinic-scoped — patient is global) ---
+    // --- Issue patient JWT, scoped to the clinic they verified at ---
+    // The patient identity (patient_id) is global, but a session belongs to the
+    // clinic where it was created. The frontend uses clinic_id so a session for
+    // one clinic isn't treated as "verified" on another (e.g. the "My
+    // appointments" button only shows for the clinic you actually verified at).
+    const clinic_id = record.clinic_id
     const token = jwt.sign(
-      { patient_id, contact_value, contact_type },
+      { patient_id, contact_value, contact_type, clinic_id },
       process.env.JWT_SECRET,
       { expiresIn: "12h" }
     )
@@ -253,6 +258,7 @@ export const verifyOtp = async (req, res) => {
       message: "OTP verified successfully.",
       token,
       patient_id,
+      clinic_id,
     })
   } catch (error) {
     console.error("verifyOtp error:", error)

@@ -4,6 +4,7 @@ import { getDoctorSlots } from "../controllers/scheduleController.js"
 import { createSessionNotes, getSessionNotes, getPatientHistoryWithNotes } from "../controllers/SessionNotes.js"
 import { protectDoctor } from "../middleware/auth.js"
 import { enforceSubscription } from "../middleware/tenant.js"
+import { forgotPassword, resetPassword } from "../controllers/passwordResetController.js"
 
 // --- Tenant-resolved router (patient-facing, subdomain-scoped) ---
 const PatientDoctorRouter = express.Router()
@@ -19,6 +20,11 @@ const DoctorAuthRouter = express.Router()
 
 // Doctor login (public)
 DoctorAuthRouter.post("/login", doctorLogin)
+
+// Password reset (public — the doctor is locked out by definition).
+// Same flow as the admin side, sharing one service and controller.
+DoctorAuthRouter.post("/forgot-password", forgotPassword("doctor"))
+DoctorAuthRouter.post("/reset-password", resetPassword("doctor"))
 
 // NOTE: the old public GET /:email doctor lookup was removed — it leaked
 // doctor data across clinics and shadowed GET /appointments below.

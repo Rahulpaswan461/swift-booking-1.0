@@ -74,7 +74,13 @@ export default function ClinicLanding() {
       .finally(() => setDoctorLoading(false));
   }, []);
 
-  const isVerified = !!localStorage.getItem('token');
+  // "Verified" only when the stored patient session belongs to THIS clinic.
+  // The patient token is global, so a session created at another clinic must
+  // NOT be treated as verified here (otherwise "My appointments" would show on
+  // a clinic the patient has never booked at).
+  const isVerified =
+    !!localStorage.getItem('token') &&
+    localStorage.getItem('patient_clinic') === String(clinic?.id);
 
   const handleBookNow = () => {
     if (isVerified) {
@@ -488,6 +494,23 @@ export default function ClinicLanding() {
                 <div>
                   <h3 className="font-semibold text-ink-900">Find us</h3>
                   <p className="mt-1 text-sm leading-relaxed text-gray-500">{clinic.address}</p>
+                  {/* Hand the address to the patient's own maps app rather than
+                      embedding a map: no API key, and they get real navigation.
+                      `search/?api=1` is Google's documented cross-platform URL —
+                      it opens the native app on mobile and the web map on desktop. */}
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      `${clinic.name || ''} ${clinic.address}`.trim()
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 transition hover:text-brand-800"
+                  >
+                    Get directions
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M5 3l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </a>
                 </div>
               </div>
             )}

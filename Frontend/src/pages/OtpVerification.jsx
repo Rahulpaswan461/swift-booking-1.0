@@ -70,7 +70,7 @@ export default function OtpVerification() {
       })
       console.log('res ', res)
       // Save patient token AND patient_id using the new context method
-      savePatient(res.data.token, res.data.patient_id, contactValue, contactType)
+      savePatient(res.data.token, res.data.patient_id, contactValue, contactType, res.data.clinic_id)
 
       // Fetch clinic info for branding
       try {

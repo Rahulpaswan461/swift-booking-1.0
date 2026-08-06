@@ -1,9 +1,9 @@
 // Env-aware clinic URL builder — mirrors Backend/utils/clinicUrl.js.
 // Dev:  VITE_APP_BASE_DOMAIN=localhost:3000 → http://{slug}.localhost:3000
-// Prod: VITE_APP_BASE_DOMAIN=healibrate.in    → https://{slug}.healibrate.in
+// Prod: VITE_APP_BASE_DOMAIN=healibrate.com    → https://{slug}.healibrate.com
 // Never hardcode the domain in components — always build URLs through this.
 
-const BASE_DOMAIN = import.meta.env.VITE_APP_BASE_DOMAIN || 'healibrate.in'
+const BASE_DOMAIN = import.meta.env.VITE_APP_BASE_DOMAIN || 'healibrate.com'
 const PROTOCOL =
   import.meta.env.VITE_APP_PROTOCOL ||
   (BASE_DOMAIN.startsWith('localhost') ? 'http' : 'https')

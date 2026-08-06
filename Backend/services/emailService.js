@@ -1,32 +1,29 @@
-import nodemailer from "nodemailer"
+import { Resend } from "resend"
 import { buildClinicUrl } from "../utils/clinicUrl.js"
 import createLogger from "../utils/logger.js"
 
 const log = createLogger("email")
 
-// Any SMTP relay works — set SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS
-// (e.g. Brevo: smtp-relay.brevo.com:587, free 300 emails/day).
-// Falls back to Gmail via EMAIL_USER/EMAIL_PASSWORD when SMTP_HOST unset.
-const transporter = process.env.SMTP_HOST
-  ? nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: Number(process.env.SMTP_PORT) === 465,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    })
-  : nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
-      },
-    })
+// Email delivery via Resend (resend.com) — used in every environment.
+// Configure in Backend/.env:
+//   RESEND_API_KEY=re_...                      (Resend → API Keys)
+//   EMAIL_FROM=noreply@send.healibrate.com     (address on your VERIFIED domain)
+// The from address MUST be on a domain verified in Resend (e.g. the
+// send.healibrate.com subdomain). The display name is added per-email below.
+//
+// Placeholder key so a missing RESEND_API_KEY can't crash the app at import —
+// verifyEmailTransport() reports it loudly at boot, and any send then fails
+// with a clear auth error instead of a silent one.
+const resend = new Resend(process.env.RESEND_API_KEY || "re_missing_key")
 
-// Sender address: SMTP relays require a verified sender
-const FROM_ADDRESS = process.env.EMAIL_FROM || process.env.EMAIL_USER
+// Accept either a bare address ("noreply@…") or "Name <noreply@…>" in
+// EMAIL_FROM and extract just the address — the display name is set per-email
+// (the clinic's name for patient mail, "Healibrate" for platform mail).
+function bareEmail(value) {
+  const m = /<([^>]+)>/.exec(value || "")
+  return (m ? m[1] : value || "").trim()
+}
+const FROM_EMAIL = bareEmail(process.env.EMAIL_FROM) || "noreply@send.healibrate.com"
 
 const DEFAULT_ACCENT = "#1d7f72"
 
@@ -126,13 +123,12 @@ function emailLayout({ clinic, title, preheader = "", bodyHtml }) {
  * Plain internal email (founder digests, support notifications) —
  * not clinic-branded.
  */
-export async function sendPlainEmail({ to, subject, html }) {
-  return transporter.sendMail({
-    from: `"Healibrate" <${FROM_ADDRESS}>`,
-    to,
-    subject,
-    html,
-  })
+export async function sendPlainEmail({ to, subject, html, replyTo }) {
+  const payload = { from: `"Healibrate" <${FROM_EMAIL}>`, to, subject, html }
+  if (replyTo) payload.replyTo = replyTo
+  const { data, error } = await resend.emails.send(payload)
+  if (error) throw new Error(error.message || JSON.stringify(error))
+  return data
 }
 
 async function send({ to, subject, html, clinic, type = "email" }) {
@@ -140,47 +136,38 @@ async function send({ to, subject, html, clinic, type = "email" }) {
     log.warn("Email skipped — no recipient address", { type, subject })
     return null
   }
-  const from = `"${displayNameOf(clinic)}" <${FROM_ADDRESS}>`
+  const from = `"${displayNameOf(clinic)}" <${FROM_EMAIL}>`
   try {
-    const res = await transporter.sendMail({ from, to, subject, html })
-    log.info("Email sent", { type, to, messageId: res.messageId })
-    return res
+    // Resend returns { data, error } rather than throwing on API errors.
+    const { data, error } = await resend.emails.send({ from, to, subject, html })
+    if (error) throw new Error(error.message || JSON.stringify(error))
+    log.info("Email sent", { type, to, messageId: data?.id })
+    return data
   } catch (err) {
-    // The one line that was missing when email "silently" broke: it names
-    // the recipient, the SMTP error code, and the relay's response.
-    log.error("Email send FAILED", {
-      type, to, from: FROM_ADDRESS,
-      error: err.message,
-      code: err.code,
-      command: err.command,
-      response: err.response,
-    })
+    // The one line that was missing when email "silently" broke: names the
+    // recipient and the exact Resend error.
+    log.error("Email send FAILED", { type, to, from: FROM_EMAIL, error: err.message })
     throw err
   }
 }
 
 /**
- * Verify the SMTP connection at startup so a bad host/credential is caught
- * immediately (logged loudly) instead of silently failing on the first email.
+ * Confirm email is configured at startup so a missing key is caught loudly
+ * instead of silently failing on the first email. Resend is an HTTP API (no
+ * SMTP connection to open), so this checks the API key + sender are set.
  * Call once during server boot.
  */
 export async function verifyEmailTransport() {
-  const usingSmtp = !!process.env.SMTP_HOST
-  const target = usingSmtp ? `${process.env.SMTP_HOST}:${process.env.SMTP_PORT || 587}` : "gmail"
-  try {
-    await transporter.verify()
-    log.info("SMTP transport ready", { target, from: FROM_ADDRESS })
-    return true
-  } catch (err) {
-    log.error("SMTP transport verification FAILED — emails will not send", {
-      target,
-      user: process.env.SMTP_USER || process.env.EMAIL_USER || "(unset)",
-      from: FROM_ADDRESS || "(unset)",
-      error: err.message,
-      code: err.code,
-    })
+  if (!process.env.RESEND_API_KEY) {
+    log.error("RESEND_API_KEY not set — emails will NOT send. Add it to Backend/.env")
     return false
   }
+  if (!FROM_EMAIL || !FROM_EMAIL.includes("@")) {
+    log.error("EMAIL_FROM is not a valid address — emails will NOT send", { from: FROM_EMAIL || "(unset)" })
+    return false
+  }
+  log.info("Email ready (Resend)", { from: FROM_EMAIL })
+  return true
 }
 
 // Links in patient emails point at the clinic's own subdomain when we
@@ -217,6 +204,41 @@ export const sendOtpEmail = async ({ email, otp, clinic, ttlSeconds = 600 }) => 
   })
 
   return send({ to: email, subject: `${otp} is your ${clinicName} verification code`, html, clinic, type: "otp" })
+}
+
+// ── Staff password reset ──────────────────────────────────────
+
+/**
+ * Password reset code for clinic staff (admins and doctors).
+ * Distinct from the patient OTP email: this one is about account access,
+ * so it names the account and warns the reader if they didn't ask for it.
+ */
+export const sendPasswordResetEmail = async ({ to, otp, clinic, recipientName, ttlMinutes = 1 }) => {
+  const accent = accentOf(clinic)
+  const clinicName = displayNameOf(clinic)
+  const ttlText = `${ttlMinutes} minute${ttlMinutes === 1 ? "" : "s"}`
+  const greeting = recipientName ? `Hi ${recipientName},` : "Hi,"
+
+  const html = emailLayout({
+    clinic,
+    title: "Reset your password",
+    preheader: `${otp} is your password reset code`,
+    bodyHtml: `
+      <p style="margin:0 0 20px 0; color:#4b5563; font-size:14px; line-height:1.7;">
+        ${greeting} use this code to set a new password for your
+        <strong>${clinicName}</strong> account. It expires in <strong>${ttlText}</strong>.
+      </p>
+      <div style="text-align:center; margin:0 0 20px 0;">
+        <span style="display:inline-block; background:#f4f6f8; border:1px dashed ${accent}; border-radius:12px;
+              padding:18px 32px; font-size:32px; font-weight:800; letter-spacing:10px; color:${accent};">${otp}</span>
+      </div>
+      <p style="margin:0; color:#9ca3af; font-size:12px; line-height:1.7;">
+        If you didn't request a password reset, you can safely ignore this email —
+        your password stays unchanged. If this keeps happening, contact your clinic administrator.
+      </p>`,
+  })
+
+  return send({ to, subject: `${otp} is your password reset code`, html, clinic, type: "password_reset" })
 }
 
 // ── Booking confirmation ──────────────────────────────────────
@@ -413,5 +435,65 @@ export const sendReminderEmail = async ({ patient, doctor, appointment, clinic }
     html,
     clinic,
     type: "reminder",
+  })
+}
+
+// ── Payment received ──────────────────────────────────────────
+// Sent by us on payment.succeeded, so fulfillment never depends on the
+// payment provider's own receipt email being delivered.
+
+function formatMoney(amount, currency = "INR") {
+  if (amount === null || amount === undefined) return ""
+  // Providers report minor units (paise); show the major unit.
+  const major = Number(amount) / 100
+  if (!Number.isFinite(major)) return ""
+  try {
+    return new Intl.NumberFormat("en-IN", { style: "currency", currency }).format(major)
+  } catch {
+    return `${major} ${currency}`
+  }
+}
+
+function formatDateTime(value) {
+  if (!value) return ""
+  try {
+    return new Date(value).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+  } catch {
+    return String(value)
+  }
+}
+
+export const sendPaymentSuccessEmail = async ({ to, clinic, planLabel, amount, currency, nextBillingDate, receiptUrl }) => {
+  const accent = accentOf(clinic)
+  const clinicName = displayNameOf(clinic)
+  const amountText = formatMoney(amount, currency)
+
+  const html = emailLayout({
+    clinic,
+    title: "Payment received",
+    preheader: `Your ${planLabel || ""} plan is active`.trim(),
+    bodyHtml: `
+      <p style="margin:0 0 20px 0; color:#4b5563; font-size:14px; line-height:1.7;">
+        Thanks — we've received your payment and your
+        <strong>${planLabel || "subscription"}</strong> plan for
+        <strong>${clinicName}</strong> is now active. All plan features are unlocked.
+      </p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
+        ${planLabel ? detailRow("Plan", planLabel, { strong: true }) : ""}
+        ${amountText ? detailRow("Amount paid", amountText, { strong: true, accent }) : ""}
+        ${nextBillingDate ? detailRow("Next billing date", formatDateTime(nextBillingDate)) : ""}
+      </table>
+      ${receiptUrl ? `<div style="margin:0 0 8px 0;">${button(receiptUrl, "View receipt", { accent })}</div>` : ""}
+      <p style="margin:16px 0 0 0; color:#9ca3af; font-size:12px; line-height:1.7;">
+        You can view your billing history any time from Plan &amp; Billing in your admin dashboard.
+      </p>`,
+  })
+
+  return send({
+    to,
+    subject: `Payment received — your ${planLabel || "subscription"} plan is active`,
+    html,
+    clinic,
+    type: "payment_success",
   })
 }

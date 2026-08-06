@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { doctorApi } from '../../api/axios'
 import Logo from '../../components/Logo'
 
@@ -70,7 +70,12 @@ export default function DoctorLogin() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Password</label>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Password</label>
+                  <Link to="/doctor/forgot-password" className="text-xs font-semibold text-brand-700 transition hover:text-brand-800">
+                    Forgot password?
+                  </Link>
+                </div>
                 <div className="relative">
                   <input
                     type={show ? 'text' : 'password'}

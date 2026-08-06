@@ -24,11 +24,13 @@ import PatientHistory      from './pages/PatientHistory'
 
 // Doctor pages
 import DoctorLogin     from './pages/doctor/DoctorLogin'
+import DoctorForgotPassword from './pages/doctor/ForgotPassword'
 import ChangePassword  from './pages/doctor/ChangePassword'
 import DoctorDashboard from './pages/doctor/DoctorDashboard'
 
 // Admin pages
 import AdminLogin        from './pages/admin/AdminLogin'
+import AdminForgotPassword from './pages/admin/ForgotPassword'
 import RegisterClinic    from './pages/admin/RegisterClinic'
 import AdminDashboard    from './pages/admin/AdminDashboard'
 import AdminAppointments from './pages/admin/AdminAppointments'
@@ -93,6 +95,7 @@ export default function App() {
             <Route path="/internal/metrics"   element={<PlatformMetrics />} />
             <Route path="/admin/register"     element={<RegisterClinic />} />
             <Route path="/admin/login"        element={<AdminLogin />} />
+            <Route path="/admin/forgot-password" element={<AdminForgotPassword />} />
 
             {/* ── Patient flow ─────────────────────────────── */}
             <Route path="/verify"       element={<EmailVerification />} />
@@ -106,6 +109,7 @@ export default function App() {
 
             {/* ── Doctor flow ──────────────────────────────── */}
             <Route path="/doctor/login"            element={<DoctorLogin />} />
+            <Route path="/doctor/forgot-password"  element={<DoctorForgotPassword />} />
             <Route path="/doctor/change-password"  element={<DoctorRoute><ChangePassword /></DoctorRoute>} />
             <Route path="/doctor/dashboard"        element={<DoctorRoute><DoctorDashboard /></DoctorRoute>} />
 
