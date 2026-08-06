@@ -38,17 +38,75 @@ const DECLINED_STATUSES = new Set([
 ])
 const isDeclined = (status) => DECLINED_STATUSES.has(String(status || '').toLowerCase())
 
+// Money arrives in minor units (paise) from the payment provider.
+const formatAmount = (amount, currency = 'INR') => {
+  if (amount === null || amount === undefined) return '—'
+  const major = Number(amount) / 100
+  if (!Number.isFinite(major)) return '—'
+  try {
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency }).format(major)
+  } catch {
+    return `${major} ${currency}`
+  }
+}
+
+const formatPaidAt = (value) => {
+  if (!value) return '—'
+  const d = new Date(value)
+  return Number.isNaN(d.getTime())
+    ? '—'
+    : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+const STATUS_STYLES = {
+  succeeded: { label: 'Paid', className: 'border-green-200 bg-green-50 text-green-700' },
+  failed: { label: 'Failed', className: 'border-red-200 bg-red-50 text-red-700' },
+  refunded: { label: 'Refunded', className: 'border-gray-200 bg-gray-50 text-gray-600' },
+}
+
 export default function BillingPage() {
   const [clinic, setClinic] = useState(null)
+  const [payments, setPayments] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(true)
   const [loading, setLoading] = useState(true)
   const [redirecting, setRedirecting] = useState('')
   const [error, setError] = useState('')
   const [searchParams] = useSearchParams()
-  const paymentSuccess = searchParams.get('status') === 'success'
+
+  // We're back from the hosted checkout. `from=checkout` is our own marker;
+  // `status=success` is the legacy one, still honoured for links already in
+  // flight. Either way the URL only tells us the user RETURNED — never whether
+  // the payment worked. That is confirmed server-side below.
+  const returnedFromCheckout =
+    searchParams.get('from') === 'checkout' ||
+    searchParams.get('status') === 'success' ||
+    !!searchParams.get('subscription_id')
+
+  // The provider appends its own outcome params; a declined/cancelled payment
+  // should fail fast instead of sitting through the 30s poll.
+  const providerSaysFailed = ['status', 'payment_status', 'redirect_status']
+    .map((key) => searchParams.get(key))
+    .some(isDeclined)
+
   const subscriptionId =
     searchParams.get('subscription_id') || searchParams.get('subscriptionId')
-  // Post-payment state: 'processing' | 'active' | 'pending' | 'failed' | null
-  const [postPay, setPostPay] = useState(paymentSuccess ? 'processing' : null)
+  // Post-payment state: 'processing' | 'active' | 'unconfirmed' | 'failed' | null
+  const [postPay, setPostPay] = useState(
+    returnedFromCheckout ? (providerSaysFailed ? 'failed' : 'processing') : null
+  )
+
+  // Payment ledger — the persistent record of every charge. Kept separate from
+  // the clinic fetch so a history failure never blocks the plan UI.
+  const loadHistory = async () => {
+    try {
+      const res = await adminApi.get('/admin/billing/history')
+      setPayments(res.data.data || [])
+    } catch {
+      setPayments([])
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -63,12 +121,17 @@ export default function BillingPage() {
     const cleanUrl = () => window.history.replaceState({}, '', '/admin/billing')
 
     const run = async () => {
+      loadHistory()
+
       // Normal visit (not returning from checkout).
-      if (!paymentSuccess) {
+      if (!returnedFromCheckout) {
         const c = await fetchClinic()
         if (!cancelled) { setClinic(c); setLoading(false) }
         return
       }
+
+      // Provider reported an explicit decline — no point polling.
+      if (providerSaysFailed) { setLoading(false); cleanUrl(); return }
 
       // Returning from Dodo. The webhook is the source of truth, so we POLL
       // clinic/me while it activates the plan. We also fire one verify call as
@@ -87,7 +150,8 @@ export default function BillingPage() {
         const c = await fetchClinic()
         if (cancelled) return
         if (c) setClinic(c)
-        if (c?.subscription_active) { setPostPay('active'); cleanUrl(); return }
+        // Activated — refetch the ledger so the new charge shows immediately.
+        if (c?.subscription_active) { setPostPay('active'); loadHistory(); cleanUrl(); return }
         // Verify came back with a definitive decline → stop waiting.
         if (verifyResult && verifyResult.active === false && isDeclined(verifyResult.status)) {
           setPostPay('failed'); cleanUrl(); return
@@ -99,7 +163,7 @@ export default function BillingPage() {
       if (!cancelled) {
         // Timed out. If verify told us it was declined, show failure; otherwise
         // it's genuinely still processing (webhook not in yet).
-        setPostPay(verifyResult && isDeclined(verifyResult.status) ? 'failed' : 'pending')
+        setPostPay(verifyResult && isDeclined(verifyResult.status) ? 'failed' : 'unconfirmed')
         cleanUrl()
       }
     }
@@ -166,12 +230,16 @@ export default function BillingPage() {
             </p>
           </div>
         )}
-        {postPay === 'pending' && (
+        {postPay === 'unconfirmed' && (
           <div className="mb-6 max-w-4xl rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
-            <p className="text-sm font-semibold text-amber-800">Payment received — finalizing your plan</p>
+            {/* Deliberately does NOT claim the payment succeeded — at this point
+                we genuinely don't know, and asserting receipt for a failed
+                payment is worse than admitting uncertainty. */}
+            <p className="text-sm font-semibold text-amber-800">We couldn’t confirm your payment yet</p>
             <p className="mt-0.5 text-sm text-amber-700">
-              This is taking a little longer than usual to confirm. Your plan will activate automatically —
-              refresh in a moment. If it doesn’t activate shortly, contact support.
+              No plan has been activated. If your payment went through, it will activate automatically —
+              refresh this page in a moment and check <span className="font-semibold">Payment history</span> below.
+              If it was declined, nothing was charged and you can try again.
             </p>
           </div>
         )}
@@ -266,6 +334,68 @@ export default function BillingPage() {
             )
           })}
         </div>
+
+        {/* Payment history — the persistent record of every charge */}
+        <section className="mt-10 max-w-4xl">
+          <h2 className="font-display text-xl font-semibold text-ink-900">Payment history</h2>
+          <p className="mt-1 text-sm text-gray-500">Every charge on your clinic’s account</p>
+
+          <div className="mt-4 overflow-hidden rounded-2xl border border-surface-100 bg-white">
+            {historyLoading ? (
+              <p className="px-5 py-6 text-sm text-gray-400">Loading payments…</p>
+            ) : payments.length === 0 ? (
+              <p className="px-5 py-6 text-sm text-gray-400">
+                No payments yet. Once you subscribe, every charge will appear here.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-surface-100 text-xs uppercase tracking-wider text-gray-400">
+                      <th className="px-5 py-3 font-bold">Date</th>
+                      <th className="px-5 py-3 font-bold">Plan</th>
+                      <th className="px-5 py-3 font-bold">Amount</th>
+                      <th className="px-5 py-3 font-bold">Status</th>
+                      <th className="px-5 py-3 font-bold">Receipt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map((p) => {
+                      const badge = STATUS_STYLES[p.status] || {
+                        label: p.status || 'Unknown',
+                        className: 'border-gray-200 bg-gray-50 text-gray-600',
+                      }
+                      return (
+                        <tr key={p.id} className="border-b border-surface-100 last:border-0">
+                          <td className="px-5 py-3 text-gray-600">{formatPaidAt(p.paid_at)}</td>
+                          <td className="px-5 py-3 capitalize text-gray-600">{p.plan || '—'}</td>
+                          <td className="px-5 py-3 font-semibold text-ink-900">
+                            {formatAmount(p.amount, p.currency)}
+                          </td>
+                          <td className="px-5 py-3">
+                            <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${badge.className}`}>
+                              {badge.label}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3">
+                            {p.receipt_url ? (
+                              <a href={p.receipt_url} target="_blank" rel="noopener noreferrer"
+                                className="text-sm font-semibold text-brand-600 hover:text-brand-700">
+                                View
+                              </a>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </section>
 
         <p className="mt-6 max-w-4xl text-xs leading-relaxed text-gray-400">
           Payments are processed securely by Dodo Payments. Subscriptions renew monthly and can be

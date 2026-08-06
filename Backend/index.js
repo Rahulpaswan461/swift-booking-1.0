@@ -13,6 +13,7 @@ import { submitSupportRequest } from "./controllers/supportController.js"
 import { getPlatformMetrics } from "./controllers/platformController.js"
 import { dodoWebhook } from "./controllers/billingController.js"
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js"
+import { optionalAdmin } from "./middleware/auth.js"
 import { verifyEmailTransport } from "./services/emailService.js"
 import { dodoConfigured } from "./services/dodoPayments.js"
 import { EARLY_ACCESS } from "./config/plans.js"
@@ -31,8 +32,8 @@ app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }))
 
 // Allow the platform domain and every clinic subdomain, in dev and prod.
 // e.g. http://localhost:5173, http://apollo.localhost:5173,
-//      https://healibrate.in, https://apollo.healibrate.in
-const APP_BASE_DOMAIN = (process.env.APP_BASE_DOMAIN || "healibrate.in").split(":")[0]
+//      https://healibrate.com, https://apollo.healibrate.com
+const APP_BASE_DOMAIN = (process.env.APP_BASE_DOMAIN || "healibrate.com").split(":")[0]
 const CORS_EXTRA = ["https://swift-booking-1-0.vercel.app"]
 app.use(cors({
     origin(origin, cb) {
@@ -59,7 +60,9 @@ app.get("/health", (req, res) => {
 })
 
 // --- Platform-level routes (no tenant): support + founder metrics ---
-app.post("/api/support", submitSupportRequest)
+// optionalAdmin: captures clinic_id when a logged-in admin uses the in-app help
+// widget; website visitors submit anonymously (clinic_id stays null).
+app.post("/api/support", optionalAdmin, submitSupportRequest)
 app.get("/api/platform/metrics", getPlatformMetrics)
 
 // --- Payment webhooks (signature-verified, no auth) ---
@@ -95,13 +98,13 @@ app.listen(PORT, () => {
     // instead of surfacing as a mysterious runtime failure later.
     log.info("Environment", {
         nodeEnv: process.env.NODE_ENV || "development",
-        baseDomain: process.env.APP_BASE_DOMAIN || "(default healibrate.in)",
+        baseDomain: process.env.APP_BASE_DOMAIN || "(default healibrate.com)",
         supabase: process.env.SUPABASE_URL ? "configured" : "MISSING",
         payments: dodoConfigured() ? "configured" : "not configured",
         billingEnforced: EARLY_ACCESS ? "no (early access / beta)" : "yes",
-        email: process.env.SMTP_HOST ? `smtp:${process.env.SMTP_HOST}` : (process.env.EMAIL_USER ? "gmail" : "MISSING"),
+        email: process.env.RESEND_API_KEY ? "resend" : "MISSING",
     })
-
+   
     // Actively test the SMTP connection so a bad credential is caught NOW,
     // loudly — this is exactly the "email silently not working" case.
     verifyEmailTransport()

@@ -90,3 +90,20 @@ export const protectAdmin = (req, res, next) => {
         return res.status(401).json({ success: false, message: 'Invalid or expired token.' })
     }
 }
+
+// Optional admin auth: attaches req.admin when a valid admin token is present,
+// but NEVER rejects. Used by public routes that also serve logged-in admins
+// (e.g. the support form: website visitors submit anonymously, while the in-app
+// help widget carries the admin token so we can tag the request with clinic_id).
+export const optionalAdmin = (req, res, next) => {
+    const authHeader = req.headers.authorization
+    if (authHeader?.startsWith('Bearer ')) {
+        try {
+            const decoded = jwt.verify(authHeader.split(' ')[1], process.env.JWT_SECRET)
+            if (decoded.role === 'admin' && decoded.clinic_id) req.admin = decoded
+        } catch {
+            // Invalid/expired token → treat as anonymous, don't block the submission.
+        }
+    }
+    next()
+}

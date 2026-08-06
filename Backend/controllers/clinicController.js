@@ -395,6 +395,7 @@ export const getMyClinic = async (req, res) => {
     // vs. a "choose a plan" prompt.
     const subscriptionActive = EARLY_ACCESS || !!activeSub
 
+
     // The plan shown to the admin. Prefer the active subscription's plan;
     // during early access fall back to the clinic's stored plan for the label.
     const activePlan = activeSub?.plan || (EARLY_ACCESS ? clinic.subscription_plan : null)

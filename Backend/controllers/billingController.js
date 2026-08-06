@@ -4,7 +4,12 @@ import { normalizePlan } from "../config/plans.js"
 import { buildClinicUrl } from "../utils/clinicUrl.js"
 
 /**
- * Build the post-checkout return URL. The admin must land back on the SAME
+ * Build the post-checkout return URL. Marked `from=checkout` rather than
+ * `status=success`: the provider appends its OWN status params, and a
+ * hardcoded "success" both masks them and would be a lie after a failed
+ * payment. What actually happened is confirmed server-side, never from the URL.
+ *
+ * The admin must land back on the SAME
  * origin they started from (their session token is per-origin), so we honor
  * the origin the frontend reports — but only if it's one we trust (the
  * clinic's own subdomain or the platform host), to avoid an open redirect.
@@ -19,10 +24,10 @@ function resolveReturnUrl(clinic, requestedOrigin) {
   if (requestedOrigin) {
     try {
       const origin = new URL(requestedOrigin).origin
-      if (allowed.has(origin)) return `${origin}/admin/billing?status=success`
+      if (allowed.has(origin)) return `${origin}/admin/billing?from=checkout`
     } catch { /* fall through to default */ }
   }
-  return buildClinicUrl(clinic.slug, "/admin/billing?status=success")
+  return buildClinicUrl(clinic.slug, "/admin/billing?from=checkout")
 }
 
 /**
@@ -103,6 +108,33 @@ export const verifySubscription = async (req, res) => {
     return res.status(502).json({
       success: false,
       message: "Couldn't confirm your payment yet. If you were charged, it will activate shortly.",
+    })
+  }
+}
+
+/**
+ * GET /api/admin/billing/history — the clinic's payment ledger.
+ * Lets an admin confirm at any time whether a payment succeeded, rather
+ * than relying on the transient post-checkout banner or the provider's
+ * receipt email.
+ */
+export const getBillingHistory = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("payments")
+      .select("id, plan, amount, currency, status, paid_at, receipt_url")
+      .eq("clinic_id", req.admin.clinic_id)
+      .order("paid_at", { ascending: false })
+      .limit(50)
+
+    if (error) throw new Error(error.message)
+
+    return res.status(200).json({ success: true, data: data || [] })
+  } catch (error) {
+    console.error("getBillingHistory error:", error.message)
+    return res.status(500).json({
+      success: false,
+      message: "Couldn't load your payment history. Please try again shortly.",
     })
   }
 }

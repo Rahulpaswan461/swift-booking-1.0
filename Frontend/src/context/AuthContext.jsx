@@ -55,11 +55,15 @@ export function AuthProvider({ children }) {
     setContactType(type);
   };
 
-  const savePatient = (t, pid, c, type = 'email') => {
+  const savePatient = (t, pid, c, type = 'email', clinicId = null) => {
     localStorage.setItem('token', t);
     localStorage.setItem('patient_id', pid);
     localStorage.setItem('otp_contact', c);
     localStorage.setItem('otp_contact_type', type);
+    // The clinic this session belongs to — used to scope "verified" state so a
+    // session for one clinic isn't treated as verified on another.
+    if (clinicId != null) localStorage.setItem('patient_clinic', String(clinicId));
+    else localStorage.removeItem('patient_clinic');
     setToken(t);
     setPatientId(pid);
     setContact(c);
@@ -90,6 +94,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('otp_contact');
     localStorage.removeItem('otp_contact_type');
     localStorage.removeItem('patient_id');
+    localStorage.removeItem('patient_clinic');
     setToken(null);
     setPatientId(null);
     setContact(null);

@@ -1,8 +1,9 @@
 import crypto from "crypto"
 import supabase from "../config/supabase.js"
-import { normalizePlan } from "../config/plans.js"
+import { normalizePlan, planConfig } from "../config/plans.js"
 import { invalidateSubscriptionCache } from "../middleware/tenant.js"
 import { buildClinicUrl } from "../utils/clinicUrl.js"
+import { sendPaymentSuccessEmail } from "./emailService.js"
 
 /**
  * Dodo Payments integration (dodopayments.com) — Merchant of Record,
@@ -50,8 +51,8 @@ export async function createSubscriptionCheckout({ plan, clinic, adminEmail, ret
   // present when they land back. Falls back to the clinic subdomain.
   const returnUrl = returnUrlOverride
     || (clinic?.slug
-      ? buildClinicUrl(clinic.slug, "/admin/billing?status=success")
-      : `${process.env.FRONTEND_URL || ""}/admin/billing?status=success`)
+      ? buildClinicUrl(clinic.slug, "/admin/billing?from=checkout")
+      : `${process.env.FRONTEND_URL || ""}/admin/billing?from=checkout`)
 
   const res = await fetch(`${API_BASE}/subscriptions`, {
     method: "POST",
@@ -132,62 +133,63 @@ export async function verifyAndActivateSubscription(subscriptionId, expectedClin
   }
 
   const plan = normalizePlan(sub.metadata?.plan)
+  const providerSubId = sub.subscription_id || sub.id || subscriptionId
   await activateClinicSubscription({
     clinicId,
     plan,
-    providerSubId: sub.subscription_id || sub.id || subscriptionId,
+    providerSubId,
     nextBillingDate: sub.next_billing_date || null,
     eventType: `verify:${status}`,
   })
+
+  // Backstop the ledger: if the webhook never landed, this is the only chance
+  // to record the charge the clinic just made. Best-effort — a sync failure
+  // must not fail a payment the customer has already completed.
+  try {
+    await syncPaymentsForSubscription(providerSubId, clinicId)
+  } catch (err) {
+    console.error("[Dodo] payment ledger sync failed on verify:", err.message)
+  }
+
   return { active: true, plan, status }
 }
 
-/**
- * Apply an activated subscription to our records: upgrade the clinic's
- * plan, write the active subscription row, and clear the enforcement cache.
- * Shared by the webhook handler and verify-on-return so both paths behave
- * identically, and idempotent so repeated deliveries are harmless.
- *
- * We deliberately do NOT use `.upsert({ onConflict })` here: the
- * provider_subscription_id unique index is *partial* (WHERE ... IS NOT NULL),
- * and PostgREST can't target a partial index as an ON CONFLICT arbiter
- * ("no unique or exclusion constraint matching the ON CONFLICT
- * specification"). We find-then-update/insert explicitly instead.
- */
+/** Postgres unique-constraint violation, however the client surfaces it. */
 function isUniqueViolation(error) {
   return error?.code === "23505" || /duplicate key|unique constraint/i.test(error?.message || "")
 }
 
 /**
- * Write the active subscription row, safe against the webhook + verify-on-return
- * race (both can fire for the same payment near-simultaneously):
- *   - update the existing row for this provider_subscription_id if present;
- *   - otherwise insert; and if a concurrent activation inserted the same
- *     provider_subscription_id a moment earlier (unique-index violation),
- *     recover by updating that row instead of erroring.
+ * Write a row keyed by a provider id, safe against the webhook +
+ * verify-on-return race (both can fire for the same payment near-simultaneously):
+ *   - update the existing row for that id if present;
+ *   - otherwise insert; and if a concurrent write inserted the same id a
+ *     moment earlier (unique-index violation), recover by updating that row.
+ *
+ * Both our provider-id indexes are *partial* (WHERE ... IS NOT NULL), and
+ * PostgREST can't target a partial index as an ON CONFLICT arbiter, so
+ * `.upsert({ onConflict })` is not an option — hence find-then-update/insert.
  * Uses limit(1)+[0] rather than .single() so a stray duplicate never throws.
+ *
+ * @param orderBy column used to pick the newest row if duplicates ever exist
  */
-async function writeActiveSubscriptionRow(record, providerSubId) {
+async function upsertByProviderId(table, column, value, record, orderBy) {
   const findId = async () => {
-    const { data } = await supabase
-      .from("subscriptions")
-      .select("id")
-      .eq("provider_subscription_id", providerSubId)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .then((r) => r, () => ({ data: null }))
+    let query = supabase.from(table).select("id").eq(column, value)
+    if (orderBy) query = query.order(orderBy, { ascending: false })
+    const { data } = await query.limit(1).then((r) => r, () => ({ data: null }))
     return data?.[0] || null
   }
 
-  if (providerSubId) {
+  if (value) {
     const existing = await findId()
-    if (existing) return supabase.from("subscriptions").update(record).eq("id", existing.id)
+    if (existing) return supabase.from(table).update(record).eq("id", existing.id)
   }
 
-  const inserted = await supabase.from("subscriptions").insert(record)
-  if (inserted.error && providerSubId && isUniqueViolation(inserted.error)) {
+  const inserted = await supabase.from(table).insert(record)
+  if (inserted.error && value && isUniqueViolation(inserted.error)) {
     const dup = await findId()
-    if (dup) return supabase.from("subscriptions").update(record).eq("id", dup.id)
+    if (dup) return supabase.from(table).update(record).eq("id", dup.id)
   }
   return inserted
 }
@@ -222,7 +224,9 @@ export async function activateClinicSubscription({ clinicId, plan, providerSubId
     updated_at: nowIso,
   }
 
-  const { error } = await writeActiveSubscriptionRow(record, providerSubId)
+  const { error } = await upsertByProviderId(
+    "subscriptions", "provider_subscription_id", providerSubId, record, "updated_at"
+  )
 
   if (error) {
     console.error(`[Dodo] subscription write FAILED for clinic ${clinicId}:`, error.message)
@@ -235,6 +239,156 @@ export async function activateClinicSubscription({ clinicId, plan, providerSubId
 
   invalidateSubscriptionCache(clinicId)
   console.log(`[Dodo] Clinic ${clinicId} → ${plan} active (${eventType})`)
+}
+
+/**
+ * Record a single charge in the payments ledger.
+ *
+ * The webhook is the source of truth for fulfillment, so this runs on money
+ * events regardless of test/live mode (the code is mode-agnostic; only env
+ * config differs). Best-effort by design: the caller must not let a ledger
+ * write failure break plan activation or the 2xx webhook response.
+ *
+ * Idempotent on provider_payment_id — Dodo retries deliveries, and a
+ * redelivered event must not produce a second row.
+ */
+async function recordPayment({ clinicId, status, plan, data, eventType }) {
+  const paymentId = data.payment_id || data.id || null
+  const providerSubId = data.subscription_id || data.subscription?.subscription_id || null
+
+  // Amount/currency field names vary by event shape; accept the known spellings
+  // and leave null when absent rather than guessing a wrong number.
+  const amount = data.total_amount ?? data.amount ?? data.settlement_amount ?? null
+  const currency = data.currency || data.settlement_currency || "INR"
+  const receiptUrl = data.receipt_url || data.invoice_url || data.payment_link || null
+  const paidAt = data.created_at || data.paid_at || new Date().toISOString()
+
+  const record = {
+    clinic_id: clinicId,
+    provider: "dodo",
+    provider_payment_id: paymentId,
+    provider_subscription_id: providerSubId,
+    plan: plan || null,
+    amount: amount === null ? null : Math.round(Number(amount)),
+    currency,
+    status,
+    receipt_url: receiptUrl,
+    paid_at: paidAt,
+    metadata: { event_type: eventType },
+  }
+
+  return upsertByProviderId("payments", "provider_payment_id", paymentId, record)
+}
+
+// Webhook event type → ledger status. Refunds are matched separately via the
+// REFUND list, since Dodo spells them several ways.
+const LEDGER_STATUS_BY_EVENT = {
+  "payment.succeeded": "succeeded",
+  "payment.failed": "failed",
+}
+
+/**
+ * Map a Dodo payment object's status onto our ledger statuses.
+ * Anything still in flight (processing/pending) is deliberately not recorded —
+ * the ledger only shows settled outcomes.
+ */
+function ledgerStatusForPayment(payment) {
+  if (payment.refund_status && String(payment.refund_status).toLowerCase() !== "none") return "refunded"
+  const s = String(payment.status || "").toLowerCase()
+  if (s === "succeeded" || s === "success") return "succeeded"
+  if (s === "failed" || s === "declined") return "failed"
+  return null
+}
+
+/**
+ * Backstop for the payment ledger.
+ *
+ * The webhook is the primary writer, but it is not guaranteed: in dev the
+ * tunnel may be down, and in production a delivery can be delayed, dropped, or
+ * misconfigured. When that happens the plan still activates via verify-on-return
+ * — and without this, the clinic would have NO record of a payment they made.
+ *
+ * Pulls the real payments for a subscription from Dodo and records them.
+ * Idempotent on provider_payment_id, so it never duplicates what the webhook
+ * already wrote (and vice-versa).
+ */
+export async function syncPaymentsForSubscription(subscriptionId, clinicId) {
+  if (!subscriptionId || !clinicId) return { synced: 0 }
+
+  const res = await fetch(`${API_BASE}/payments?subscription_id=${encodeURIComponent(subscriptionId)}`, {
+    headers: { Authorization: `Bearer ${process.env.DODO_API_KEY}` },
+  })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(`Dodo ${res.status}: ${body.message || "fetch payments failed"}`)
+
+  const items = body.items || body.data || []
+  let synced = 0
+
+  for (const payment of items) {
+    const status = ledgerStatusForPayment(payment)
+    if (!status) continue
+    const { error } = await recordPayment({
+      clinicId,
+      status,
+      plan: normalizePlan(payment.metadata?.plan),
+      data: payment,
+      eventType: "verify:sync",
+    })
+    if (error) console.error(`[Dodo] ledger sync write failed (${payment.payment_id}):`, error.message)
+    else synced++
+  }
+
+  if (synced) console.log(`[Dodo] Clinic ${clinicId} — synced ${synced} payment(s) from Dodo`)
+  return { synced }
+}
+
+/**
+ * Send our own branded "payment received" email. Deliberately separate from
+ * the provider's receipt email, which may be delayed or undelivered (and is
+ * limited in test mode) — fulfillment confirmation should be ours.
+ *
+ * Best-effort: callers fire-and-forget with a .catch.
+ */
+async function notifyPaymentSuccess({ clinicId, plan, data }) {
+  const { data: clinic } = await supabase
+    .from("clinics")
+    .select("id, name, slug, email, branding")
+    .eq("id", clinicId)
+    .single()
+    .then((r) => r, () => ({ data: null }))
+
+  // Prefer the email the customer actually paid with; fall back to the clinic's.
+  const to = data.customer?.email || data.customer_email || clinic?.email
+  if (!to) {
+    console.warn(`[Dodo] no recipient for payment success email (clinic ${clinicId})`)
+    return
+  }
+
+  await sendPaymentSuccessEmail({
+    to,
+    clinic,
+    planLabel: planConfig(plan)?.label || null,
+    amount: data.total_amount ?? data.amount ?? null,
+    currency: data.currency || "INR",
+    nextBillingDate: data.next_billing_date || null,
+    receiptUrl: data.receipt_url || data.invoice_url || null,
+  })
+}
+
+/**
+ * Find the clinic that owns a subscription — used when a payment event
+ * carries no clinic_id metadata. Returns the { clinic_id, plan } row so the
+ * caller can recover both, or null when we have no record of it.
+ */
+async function findSubscriptionOwner(providerSubId) {
+  if (!providerSubId) return null
+  const { data } = await supabase
+    .from("subscriptions")
+    .select("clinic_id, plan")
+    .eq("provider_subscription_id", providerSubId)
+    .limit(1)
+    .then((r) => r, () => ({ data: null }))
+  return data?.[0] || null
 }
 
 /**
@@ -297,9 +451,20 @@ export async function handleDodoEvent(event) {
   // Dodo echoes the metadata we set at checkout on the subscription object.
   // Some payment-level events may nest it elsewhere, so check known spots.
   const metadata = data.metadata || data.subscription?.metadata || event.metadata || {}
-  const clinicId = metadata.clinic_id
-  const plan = normalizePlan(metadata.plan)
+  let clinicId = metadata.clinic_id
+  let plan = normalizePlan(metadata.plan)
   const providerSubId = data.subscription_id || data.id || data.subscription?.subscription_id || null
+
+  // Payment-level events don't always echo the subscription's metadata. Before
+  // giving up, resolve the clinic from the subscription we already recorded —
+  // otherwise a real charge would go unrecorded just for a missing metadata key.
+  if (!clinicId) {
+    const fromSub = await findSubscriptionOwner(providerSubId)
+    if (fromSub) {
+      clinicId = fromSub.clinic_id
+      if (!metadata.plan) plan = normalizePlan(fromSub.plan)
+    }
+  }
 
   if (!clinicId) {
     // Keep the payload here — it's the one case where we genuinely need to
@@ -311,6 +476,34 @@ export async function handleDodoEvent(event) {
   const ACTIVATE = ["subscription.active", "subscription.activated", "subscription.renewed", "payment.succeeded"]
   const TERMINATE = ["subscription.cancelled", "subscription.expired", "subscription.revoked", "subscription.failed"]
   const HOLD = ["subscription.on_hold", "subscription.paused", "payment.failed"]
+  const REFUND = ["payment.refunded", "refund.succeeded", "refund.created"]
+
+  // ── Ledger: record the charge itself, independently of plan state. ──
+  // Best-effort — a ledger failure must never block fulfillment below.
+  const ledgerStatus = LEDGER_STATUS_BY_EVENT[type]
+    || (REFUND.includes(type) ? "refunded" : null)
+
+  if (ledgerStatus) {
+    try {
+      const { error } = await recordPayment({ clinicId, status: ledgerStatus, plan, data, eventType: type })
+      if (error) console.error(`[Dodo] payment ledger write failed (${type}):`, error.message)
+    } catch (err) {
+      console.error(`[Dodo] payment ledger write threw (${type}):`, err.message)
+    }
+
+    if (ledgerStatus === "succeeded") {
+      // Our own branded confirmation — never let a mail failure break the webhook.
+      notifyPaymentSuccess({ clinicId, plan, data }).catch((err) =>
+        console.error("[Dodo] payment success email failed:", err.message))
+    }
+  }
+
+  // A refund is a ledger event only; it doesn't itself change plan state
+  // (Dodo sends a separate subscription.* event when access should end).
+  if (REFUND.includes(type)) {
+    console.log(`[Dodo] Clinic ${clinicId} refund recorded (${type})`)
+    return { handled: true }
+  }
 
   if (ACTIVATE.includes(type)) {
     await activateClinicSubscription({

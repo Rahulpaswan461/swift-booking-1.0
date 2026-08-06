@@ -5,8 +5,9 @@ import { registerClinic, resolveClinic, updateBranding, getMyClinic, updateClini
 import { createDoctorForClinic, listDoctorsForClinic, updateDoctorForClinic } from "../controllers/doctorManagement.js"
 import { protectAdmin } from "../middleware/auth.js"
 import { reminderHandler } from "../services/reminder.js"
-import { createCheckout, verifySubscription } from "../controllers/billingController.js"
+import { createCheckout, verifySubscription, getBillingHistory } from "../controllers/billingController.js"
 import { enforceSubscription, enforcePlanLimits } from "../middleware/tenant.js"
+import { forgotPassword, resetPassword } from "../controllers/passwordResetController.js"
 
 const adminRouter = express.Router()
 
@@ -18,6 +19,12 @@ adminRouter.get("/clinic/resolve", resolveClinic)
 
 // --- Public: Admin login ---
 adminRouter.post("/login", adminlogin)
+
+// --- Public: Password reset (no auth — the admin is locked out by definition).
+// Deliberately NOT behind enforceSubscription: an admin of an unpaid clinic
+// must still be able to recover their account in order to come back and pay.
+adminRouter.post("/forgot-password", forgotPassword("admin"))
+adminRouter.post("/reset-password", resetPassword("admin"))
 
 // --- Authenticated: logged-in admin's own clinic (clinic_id from JWT) ---
 adminRouter.get("/clinic/me", protectAdmin, getMyClinic)
@@ -59,5 +66,9 @@ adminRouter.post("/billing/checkout", protectAdmin, createCheckout)
 
 // Billing: confirm a checkout on return from Dodo and activate the plan.
 adminRouter.post("/billing/verify", protectAdmin, verifySubscription)
+
+// Billing: the clinic's payment history. Not behind enforceSubscription —
+// an admin whose plan lapsed still needs to see what they were charged.
+adminRouter.get("/billing/history", protectAdmin, getBillingHistory)
 
 export default adminRouter

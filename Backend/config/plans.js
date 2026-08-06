@@ -2,11 +2,12 @@
 // The pricing page (Frontend/src/pages/PricingPage.jsx) is the human
 // version of this file; keep the two in sync when plans change.
 //
-// While BETA_MODE is on (no payment gateway), every clinic gets every
-// feature — flip BETA_MODE=false when billing launches and enforcement
-// activates automatically, here and in the middleware.
-
-export const EARLY_ACCESS = process.env.BETA_MODE !== "false"
+// Early Access (beta): every clinic gets every feature free and billing is NOT
+// enforced. It is OPT-IN via BETA_MODE=true so the default is *enforced* — a
+// missing or misloaded env var can never silently turn billing off (which also
+// hides the "no active plan" prompt for unpaid clinics and makes it flicker
+// between runs). To run the free beta, set BETA_MODE=true explicitly.
+export const EARLY_ACCESS = process.env.BETA_MODE === "true"
 
 const PLAN_CONFIG = {
   basic: {

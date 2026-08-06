@@ -46,7 +46,7 @@ export default function ContactPage() {
                   <path d="M2 4.5l6 4.5 6-4.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </span>
-              support@healibrate.in
+              support@healibrate.com
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-600">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 border border-brand-100">
