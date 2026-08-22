@@ -198,7 +198,7 @@ export default function BillingPage() {
     <div className="flex min-h-screen bg-surface-50">
       <AdminSidebar />
 
-      <main className="flex-1 overflow-auto p-8">
+      <main className="flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
         <div className="mb-8">
           <h1 className="font-display text-3xl font-semibold text-ink-900">Plan & Billing</h1>
           <p className="mt-1 text-sm text-gray-500">Your subscription, and what each plan unlocks</p>
@@ -349,7 +349,7 @@ export default function BillingPage() {
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+                <table className="w-full min-w-[640px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-surface-100 text-xs uppercase tracking-wider text-gray-400">
                       <th className="px-5 py-3 font-bold">Date</th>

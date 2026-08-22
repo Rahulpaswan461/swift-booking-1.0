@@ -334,7 +334,7 @@ function PatientDemo() {
 
       {/* Guided hint for the current step */}
       {step === 1 && !otpSent && (
-        <GuideHint><strong>Try it:</strong> click "Send OTP". In the real product the patient receives a real 6-digit code by email or SMS — no account, no password.</GuideHint>
+        <GuideHint><strong>Try it:</strong> click "Send OTP". In the real product the patient receives a real 6-digit code by email — no account, no password.</GuideHint>
       )}
       {step === 1 && otpSent && !otpVerified && (
         <GuideHint>The code is pre-filled for the demo — click <strong>"Verify &amp; Continue"</strong>.</GuideHint>
@@ -381,9 +381,9 @@ function PatientDemo() {
             {!otpSent ? (
               <div>
                 <div className="mb-3">
-                  <label className="text-[9px] font-semibold text-gray-500 uppercase tracking-wider">Phone or Email</label>
+                  <label className="text-[9px] font-semibold text-gray-500 uppercase tracking-wider">Email address</label>
                   <div className="mt-1 p-2.5 rounded-xl border border-gray-200 bg-surface-50 text-[11px] text-ink-900 font-medium">
-                    +91 98765 43210
+                    priya@example.com
                   </div>
                 </div>
                 <button
@@ -396,17 +396,17 @@ function PatientDemo() {
             ) : !otpVerified ? (
               <div>
                 <label className="text-[9px] font-semibold text-gray-500 uppercase tracking-wider">Enter OTP</label>
-                <div className="mt-1.5 flex gap-2 justify-center">
-                  {[1, 2, 3, 4].map((d) => (
+                <div className="mt-1.5 flex gap-1.5 justify-center">
+                  {[1, 2, 3, 4, 5, 6].map((d) => (
                     <div
                       key={d}
-                      className={`w-9 h-11 rounded-xl border-2 text-center text-sm font-bold flex items-center justify-center transition ${
-                        d <= 3
+                      className={`w-7 h-10 rounded-lg border-2 text-center text-sm font-bold flex items-center justify-center transition ${
+                        d <= 4
                           ? 'border-brand-300 bg-brand-50 text-brand-700'
                           : 'border-gray-200 bg-white text-gray-300'
                       }`}
                     >
-                      {d <= 3 ? [5, 3, 8][d - 1] : ''}
+                      {d <= 4 ? [5, 3, 8, 1][d - 1] : ''}
                     </div>
                   ))}
                 </div>
@@ -416,7 +416,7 @@ function PatientDemo() {
                 >
                   Verify & Continue
                 </button>
-                <p className="text-[9px] text-gray-400 text-center mt-2">OTP sent to +91 98765 43210</p>
+                <p className="text-[9px] text-gray-400 text-center mt-2">OTP sent to priya@example.com</p>
               </div>
             ) : null}
           </div>
@@ -502,7 +502,7 @@ function PatientDemo() {
             </div>
             <p className="text-sm font-bold text-green-700 mb-1">Booking Confirmed!</p>
             <p className="text-[11px] text-gray-500 mb-4">
-              A confirmation has been sent to +91 98765 43210
+              A confirmation has been sent to priya@example.com
             </p>
             <div className="rounded-xl bg-gradient-to-br from-surface-50 to-white p-4 text-left mb-4 border border-gray-100">
               <div className="flex justify-between items-center mb-2">

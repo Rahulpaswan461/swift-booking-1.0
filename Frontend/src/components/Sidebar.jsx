@@ -1,7 +1,89 @@
-import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import Logo from './Logo'
 import SupportModal from './SupportModal'
+
+/**
+ * Responsive shell shared by the admin and doctor sidebars.
+ *
+ * Desktop (md+): a static 256px column, exactly as before.
+ * Mobile: the same column becomes a slide-in drawer behind a fixed top bar.
+ *
+ * The drawer animates with `transform` + `opacity` only — both are composited
+ * on the GPU, so opening it never triggers layout or paint. Visibility is pure
+ * CSS (`md:` breakpoints); the single piece of state is whether the drawer is
+ * open, so there is no media-query listener and no duplicated component tree.
+ */
+function SidebarShell({ children }) {
+  const [open, setOpen] = useState(false)
+  const location = useLocation()
+
+  // Navigating away should always dismiss the drawer.
+  useEffect(() => { setOpen(false) }, [location.pathname])
+
+  // While the drawer covers the screen, the page behind it must not scroll.
+  useEffect(() => {
+    if (!open) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previous }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (e) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [open])
+
+  return (
+    <>
+      {/* Mobile top bar — the only way to reach navigation below md */}
+      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center gap-3 border-b border-surface-100 bg-white px-4 md:hidden">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Open navigation menu"
+          aria-expanded={open}
+          className="-ml-1 rounded-lg p-2 text-gray-600 transition hover:bg-surface-100 hover:text-gray-900"
+        >
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+            <path d="M4 6h14M4 11h14M4 16h14" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+          </svg>
+        </button>
+        <Logo size="sm" />
+      </header>
+
+      {/* Backdrop — kept mounted so it can fade rather than pop */}
+      <div
+        onClick={() => setOpen(false)}
+        aria-hidden="true"
+        className={`fixed inset-0 z-40 bg-ink-900/40 transition-opacity duration-300 md:hidden ${
+          open ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+      />
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col overflow-y-auto border-r border-surface-100 bg-white shadow-sm transition-transform duration-300 ease-out md:static md:z-auto md:min-h-screen md:transform-none md:border-white md:transition-none ${
+          open ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Close control, drawer-only */}
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-label="Close navigation menu"
+          className="absolute right-3 top-3 rounded-lg p-2 text-gray-400 transition hover:bg-surface-100 hover:text-gray-900 md:hidden"
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M5 5l8 8M13 5l-8 8" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
+          </svg>
+        </button>
+        {children}
+      </aside>
+    </>
+  )
+}
 
 export function DoctorSidebar() {
   const navigate = useNavigate()
@@ -23,7 +105,7 @@ export function DoctorSidebar() {
   ]
 
   return (
-    <aside className="flex min-h-screen w-64 flex-col border-r border-white bg-white shadow-sm">
+    <SidebarShell>
       {/* Header */}
       <div className="border-b border-surface-100 px-6 py-6">
         <Logo size="sm" />
@@ -63,7 +145,7 @@ export function DoctorSidebar() {
           Sign out
         </button>
       </div>
-    </aside>
+    </SidebarShell>
   )
 }
 
@@ -116,7 +198,7 @@ export function AdminSidebar() {
   ]
 
   return (
-    <aside className="flex min-h-screen w-64 flex-col border-r border-white bg-white shadow-sm">
+    <SidebarShell>
       {/* Header */}
       <div className="border-b border-surface-100 px-6 py-6">
         <Logo size="sm" />
@@ -172,6 +254,6 @@ export function AdminSidebar() {
           Sign out
         </button>
       </div>
-    </aside>
+    </SidebarShell>
   )
 }

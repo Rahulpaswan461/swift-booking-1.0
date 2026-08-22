@@ -65,7 +65,7 @@ export default function AdminDashboard() {
   if (loading) return (
     <div className="flex min-h-screen bg-surface-50">
       <AdminSidebar />
-      <main className="flex-1 flex items-center justify-center text-gray-400 text-sm gap-2">
+      <main className="flex-1 flex items-center justify-center text-gray-400 text-sm gap-2 pt-14 md:pt-0">
         <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
           <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
           <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -79,7 +79,7 @@ export default function AdminDashboard() {
     <div className="flex min-h-screen bg-surface-50">
       <AdminSidebar />
 
-      <main className="flex-1 p-8 overflow-auto">
+      <main className="flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
         {/* Header */}
         <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -193,8 +193,8 @@ export default function AdminDashboard() {
             {stats.doctor_breakdown?.length > 0 && (
               <div>
                 <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Today — per doctor</h2>
-                <div className="overflow-hidden rounded-[24px] border border-surface-100 bg-white shadow-sm">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto rounded-[24px] border border-surface-100 bg-white shadow-sm">
+                  <table className="w-full min-w-[640px] text-sm">
                     <thead>
                       <tr className="border-b border-gray-100">
                         <th className="px-5 py-3 text-left text-xs font-medium text-gray-400">Doctor</th>

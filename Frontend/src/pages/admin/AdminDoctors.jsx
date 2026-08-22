@@ -129,7 +129,7 @@ export default function AdminDoctors() {
     <div className="flex min-h-screen bg-gray-50">
       <AdminSidebar />
 
-      <main className="flex-1 p-8 overflow-auto">
+      <main className="flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-display font-semibold text-gray-900">Doctors</h1>

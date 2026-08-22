@@ -630,7 +630,7 @@ export default function DoctorDashboard() {
     <div className="flex min-h-screen bg-surface-50">
       <DoctorSidebar />
 
-      <main className="flex-1 p-6 sm:p-8 overflow-auto">
+      <main className="flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
         {/* Header */}
         <div className="mb-10">
           <h1 className="font-display text-4xl font-semibold text-ink-900">
