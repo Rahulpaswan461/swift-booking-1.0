@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PlatformHeader from '../components/PlatformHeader'
+import useSeo from '../hooks/useSeo'
 
 // ── Plans — edit prices/features here ─────────────────────────
 // Features marked { soon: true } render with a "Coming soon" tag:
@@ -106,6 +107,12 @@ function FaqItem({ item, open, onToggle }) {
 }
 
 export default function PricingPage() {
+  useSeo({
+    title: 'Pricing — Healibrate',
+    description:
+      "Simple monthly plans for clinics of every size: Basic ₹99 for one doctor, Growth ₹299 for up to five, and Pro ₹499 for unlimited doctors.",
+  })
+
   const navigate = useNavigate()
   const [openFaq, setOpenFaq] = useState(0)
 

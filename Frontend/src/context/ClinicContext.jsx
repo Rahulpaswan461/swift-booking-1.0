@@ -46,11 +46,13 @@ export function ClinicProvider({ children }) {
   const clinicName = branding.clinic_name || clinic?.name || 'Healibrate';
   const logoUrl = branding.logo_url;
 
-  // Browser tab title reflects the clinic patients are visiting
+  // Browser tab title reflects the clinic patients are visiting. Platform
+  // (non-tenant) pages set their own title+description via useSeo, and this
+  // provider is their parent — parent effects run last, so returning early
+  // here is what stops it from clobbering them.
   useEffect(() => {
-    document.title = clinic
-      ? `${clinicName} — Book an appointment`
-      : 'Healibrate — Clinic appointment platform';
+    if (!clinic) return;
+    document.title = `${clinicName} — Book an appointment`;
   }, [clinic, clinicName]);
   const primaryColor = branding.primary_color || '#0171be';
   const tagline = branding.tagline || '';

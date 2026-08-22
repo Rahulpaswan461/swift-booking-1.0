@@ -2,8 +2,15 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import PlatformHeader from '../components/PlatformHeader'
+import useSeo from '../hooks/useSeo'
 
 export default function ContactPage() {
+  useSeo({
+    title: 'Contact Healibrate',
+    description:
+      "Questions about plans, setup, or getting your clinic online? Send us a message — we usually reply within a day.",
+  })
+
   const navigate = useNavigate()
   const [form, setForm] = useState({ name: '', email: '', clinic_name: '', subject: '', message: '' })
   const [sending, setSending] = useState(false)
