@@ -153,7 +153,7 @@ export default function HealibrateProductPage() {
           <StepCard
             number={2}
             title="Get Your Platform"
-            desc="Receive your own booking URL — e.g., apollo.healibrate.com"
+            desc="Receive your own booking URL — e.g., yourclinic.healibrate.com"
           />
           <StepCard
             number={3}
@@ -303,7 +303,7 @@ export default function HealibrateProductPage() {
               <p className="text-xs font-semibold text-brand-600 uppercase tracking-wider mb-2">Your Booking URL</p>
               <div className="rounded-xl bg-white border border-brand-200 px-6 py-4 shadow-sm">
                 <span className="text-gray-400 text-sm">https://</span>
-                <span className="text-brand-700 font-semibold">apollo</span>
+                <span className="text-brand-700 font-semibold">yourclinic</span>
                 <span className="text-gray-400 text-sm">.healibrate.com</span>
               </div>
               <p className="text-sm text-gray-500 mt-4">Share this with patients on WhatsApp, Instagram, or your website.</p>

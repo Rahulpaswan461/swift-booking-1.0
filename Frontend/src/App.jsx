@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ClinicProvider, useClinic } from './context/ClinicContext'
+import useRobotsPolicy from './hooks/useRobotsPolicy'
+import { isPlatformHost } from './utils/host'
 
 // Healibrate product page (shown when no tenant is resolved)
 import HealibrateProductPage from './pages/HealibrateProductPage'
@@ -11,6 +13,7 @@ import PlatformMetrics from './pages/internal/PlatformMetrics'
 
 // Landing page (shown when a tenant is resolved)
 import ClinicLanding from './pages/ClinicLanding'
+import ClinicNotFound from './pages/ClinicNotFound'
 
 // Patient pages
 import EmailVerification   from './pages/EmailVerification'
@@ -75,10 +78,18 @@ function ConditionalHome() {
     );
   }
 
-  return hasTenant ? <ClinicLanding /> : <HealibrateProductPage />;
+  if (hasTenant) return <ClinicLanding />;
+
+  // No clinic resolved. On the platform host that's the marketing homepage;
+  // on a clinic subdomain it means the slug doesn't exist, and serving the
+  // marketing site there would hand crawlers a duplicate homepage on every
+  // made-up subdomain.
+  return isPlatformHost() ? <HealibrateProductPage /> : <ClinicNotFound />;
 }
 
 export default function App() {
+  useRobotsPolicy()
+
   return (
     <BrowserRouter>
       <AuthProvider>
