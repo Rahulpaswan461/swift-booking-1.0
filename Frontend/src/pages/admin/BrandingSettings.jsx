@@ -206,7 +206,7 @@ export default function BrandingSettings() {
   if (loading) return (
     <div className="flex min-h-screen bg-surface-50">
       <AdminSidebar />
-      <main className="flex-1 flex items-center justify-center text-gray-400 text-sm gap-2">
+      <main className="flex-1 flex items-center justify-center text-gray-400 text-sm gap-2 pt-14 md:pt-0">
         <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
           <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
           <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -220,7 +220,7 @@ export default function BrandingSettings() {
     <div className="flex min-h-screen bg-surface-50">
       <AdminSidebar />
 
-      <main className="flex-1 p-8 overflow-auto">
+      <main className="flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
         <div className="mb-8">
           <h1 className="font-display text-3xl font-semibold text-ink-900">Clinic Settings</h1>
           <p className="text-gray-500 text-sm mt-1">Branding, booking link, and operating hours</p>

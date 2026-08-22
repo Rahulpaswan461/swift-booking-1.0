@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { adminApi } from '../api/axios'
 
 /**
@@ -34,7 +35,11 @@ export default function SupportModal({ onClose }) {
 
   const input = "w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
 
-  return (
+  // Rendered into <body> rather than in place: the admin sidebar that opens
+  // this modal is a transformed element on mobile, and a transformed ancestor
+  // becomes the containing block for position:fixed children — which would
+  // trap this overlay inside the 256px sidebar instead of covering the screen.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl animate-fade-up">
         <div className="mb-4 flex items-center justify-between">
@@ -89,6 +94,7 @@ export default function SupportModal({ onClose }) {
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

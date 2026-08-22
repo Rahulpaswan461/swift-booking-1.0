@@ -1,0 +1,23 @@
+# https://www.healibrate.com
+# This file is served on the platform site AND on every clinic subdomain,
+# so the rules below must be correct for both.
+
+User-agent: *
+Allow: /
+
+# Authenticated portals — no value in the index, and they leak nothing useful
+Disallow: /admin/
+Disallow: /doctor/
+Disallow: /internal/
+
+# Patient session pages — private, per-visitor, or single-use token links
+Disallow: /verify
+Disallow: /verify-otp
+Disallow: /doctors
+Disallow: /book/
+Disallow: /confirmation
+Disallow: /my-appointments
+Disallow: /cancel/
+Disallow: /reschedule/
+
+Sitemap: https://www.healibrate.com/sitemap.xml
