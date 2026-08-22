@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DemoModal from '../components/DemoModal';
 import PlatformHeader from '../components/PlatformHeader';
+import useSeo from '../hooks/useSeo'
 
 function FeatureCard({ icon, title, desc }) {
   return (
@@ -41,6 +42,12 @@ function WhyCard({ text }) {
 }
 
 export default function HealibrateProductPage() {
+  useSeo({
+    title: 'Healibrate — Appointment Booking Software for Clinics',
+    description:
+      "Give your clinic its own branded booking page. Patients pick a doctor, choose a slot, and confirm in under a minute — no account, no password. Plans from ₹99/month.",
+  })
+
   const navigate = useNavigate();
   const [showDemo, setShowDemo] = useState(false);
 

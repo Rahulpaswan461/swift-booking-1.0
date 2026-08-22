@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import PlatformHeader from '../components/PlatformHeader'
+import useSeo from '../hooks/useSeo'
 
 // Editorial, prose-first page — deliberately quieter than the home page.
 // The home page sells; this page explains who we are.
@@ -24,6 +25,12 @@ const PRINCIPLES = [
 ]
 
 export default function AboutPage() {
+  useSeo({
+    title: 'About Healibrate',
+    description:
+      "Why we built Healibrate: one platform for clinics to own their patient bookings — your own branded page, no marketplace competition, full control.",
+  })
+
   const navigate = useNavigate()
 
   return (
