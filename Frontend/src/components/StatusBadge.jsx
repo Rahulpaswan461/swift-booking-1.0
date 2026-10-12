@@ -8,7 +8,7 @@ export default function StatusBadge({ status }) {
   }
   const c = config[status] || config.pending
   return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${c.bg} ${c.text} border-transparent`}>
+    <span data-status={status} className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${c.bg} ${c.text} border-transparent`}>
       <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`}/>
       {c.label}
     </span>

@@ -1,3 +1,7 @@
+import { StaffHeader } from '../../components/StaffUI'
+import useApiSnapshot from '../../hooks/useApiSnapshot'
+import useAppointmentRealtime from '../../hooks/useAppointmentRealtime'
+import LiveStatus from '../../components/LiveStatus'
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/axios'
 import { AdminSidebar } from '../../components/Sidebar'
@@ -10,61 +14,49 @@ function formatTime(t) {
 }
 
 export default function AdminAppointments() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toLocaleDateString('en-CA'),
     status: '',
     doctor: '',
   })
   const [doctors, setDoctors] = useState([])
 
   useEffect(() => {
-    adminApi.get('/doctors')
+    adminApi.get('/admin/doctors')
       .then(res => setDoctors(res.data.data || res.data))
       .catch(console.error)
   }, [])
 
-  const fetchAppointments = () => {
-    setLoading(true)
-    const params = new URLSearchParams()
-    if (filters.date) params.append('date', filters.date)
-    if (filters.status) params.append('status', filters.status)
-    if (filters.doctor) params.append('doctor', filters.doctor)
-
-    adminApi.get(`/admin/appointments?${params}`)
-      .then(res => setData(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => { fetchAppointments() }, [filters])
+  const { data, loading, refreshing, error, refresh } = useApiSnapshot(adminApi, '/admin/appointments', filters)
+  const liveStatus = useAppointmentRealtime({ role: 'admin', onResync: refresh, onChange: event => {
+    if (event.type !== 'notes_updated' && (!filters.date || event.date === filters.date || event.previousDate === filters.date)) refresh()
+  } })
 
   const statusOptions = ['', 'confirmed', 'completed', 'cancelled', 'no_show']
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="staff-workspace flex min-h-screen">
       <AdminSidebar />
 
-      <main className="flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-display font-semibold text-gray-900">Appointments</h1>
-          <p className="text-gray-500 text-sm mt-0.5">View and filter all appointments</p>
-        </div>
+      <main className="staff-content flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
+        <StaffHeader title="Appointments" description="View and filter all appointments" />
 
+        <div className="mb-4 flex items-center gap-3"><LiveStatus status={liveStatus} /><span className="text-xs text-gray-500">{refreshing ? 'Updating…' : 'Your appointment list stays up to date.'}</span><button onClick={refresh} className="ml-auto rounded-lg border bg-white px-3 py-2 text-xs font-semibold">Refresh</button></div>
+        {(liveStatus === 'expired' || liveStatus === 'forbidden') && <p role="alert" className="mb-4 text-sm text-red-700">Live access is unavailable. <a className="underline" href="/admin/login">Sign in again</a> or contact support.</p>}
+        {error && <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{error}</p>}
         {/* Filters */}
         <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-5 flex flex-wrap gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-500">Date</label>
-            <input type="date" value={filters.date}
+            <label htmlFor="adminappointments-field-1" className="text-xs font-medium text-gray-500">Date</label>
+            <input id="adminappointments-field-1" type="date" value={filters.date}
               onChange={e => setFilters({ ...filters, date: e.target.value })}
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-500">Status</label>
-            <select value={filters.status}
+            <label htmlFor="adminappointments-field-2" className="text-xs font-medium text-gray-500">Status</label>
+            <select id="adminappointments-field-2" value={filters.status}
               onChange={e => setFilters({ ...filters, status: e.target.value })}
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white">
               <option value="">All statuses</option>
@@ -75,8 +67,8 @@ export default function AdminAppointments() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-500">Doctor</label>
-            <select value={filters.doctor}
+            <label htmlFor="adminappointments-field-3" className="text-xs font-medium text-gray-500">Doctor</label>
+            <select id="adminappointments-field-3" value={filters.doctor}
               onChange={e => setFilters({ ...filters, doctor: e.target.value })}
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white">
               <option value="">All doctors</option>
@@ -135,8 +127,7 @@ export default function AdminAppointments() {
                 <tbody className="divide-y divide-gray-50">
                   {data.data.map((appt, i) => (
                     <tr key={appt.id}
-                      className="hover:bg-gray-50 transition animate-fade-up opacity-0"
-                      style={{ animationDelay: `${i * 30}ms`, animationFillMode: 'forwards' }}>
+                      className="hover:bg-gray-50 transition">
                       <td className="px-5 py-3.5">
                         <p className="font-medium text-gray-900">{appt.patient.name}</p>
                         <p className="text-xs text-gray-400">{appt.patient.phone}</p>

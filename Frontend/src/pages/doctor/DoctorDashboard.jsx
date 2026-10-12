@@ -1,4 +1,10 @@
-import { useState, useEffect } from 'react'
+import { doctorAccessIssue } from '../../utils/doctorAccessIssue'
+import { MetricCard } from '../../components/StaffUI'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import useDoctorSchedule from '../../hooks/useDoctorSchedule'
+import useAppointmentRealtime from '../../hooks/useAppointmentRealtime'
+import useApiSnapshot from '../../hooks/useApiSnapshot'
+import LiveStatus from '../../components/LiveStatus'
 import { doctorApi } from '../../api/axios'
 import { useNavigate } from 'react-router-dom'
 import { DoctorSidebar } from '../../components/Sidebar'
@@ -22,30 +28,6 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
-function StatCard({ label, value, color, icon }) {
-  const colorMap = {
-    blue: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-100', icon: 'text-blue-600' },
-    green: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-100', icon: 'text-green-600' },
-    amber: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-100', icon: 'text-amber-600' },
-    gray: { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-100', icon: 'text-gray-500' },
-  }
-  const style = colorMap[color]
-
-  return (
-    <div className={`rounded-2xl border-2 p-6 ${style.bg} ${style.border}`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className={`text-3xl font-bold ${style.text}`}>{value}</p>
-          <p className={`text-xs font-semibold mt-1 ${style.text} opacity-80 uppercase tracking-wide`}>{label}</p>
-        </div>
-        {icon && (
-          <div className={`text-2xl ${style.icon}`}>{icon}</div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 const EVENT_LABELS = {
   booked: { label: 'Booked', color: 'text-blue-600', dot: 'bg-blue-400' },
   rescheduled: { label: 'Rescheduled', color: 'text-amber-600', dot: 'bg-amber-400' },
@@ -65,17 +47,20 @@ function eventDescription(ev) {
  * Patient History Modal — patient profile, visit stats, and the full
  * booking lifecycle (booked → rescheduled → cancelled) per appointment.
  */
-function PatientHistoryModal({ patient, onClose }) {
+function PatientHistoryModal({ patient, onClose, revision }) {
   const [history, setHistory] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
+    const controller = new AbortController()
     const patientId = patient.id || patient.patient_id
-    doctorApi.get(`/doctor/patient/${patientId}/history`)
-      .then(res => setHistory(res.data.data))
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [patient])
+    doctorApi.get(`/doctor/patient/${patientId}/history`, { signal: controller.signal })
+      .then(res => { setHistory(res.data.data); setError('') })
+      .catch(err => { if (err.code !== 'ERR_CANCELED') setError('Could not load patient history. Please reopen it to retry.') })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
+  }, [patient, revision])
 
   const p = history?.patient || patient
   const summary = history?.summary
@@ -136,6 +121,7 @@ function PatientHistoryModal({ patient, onClose }) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
+          {error && <p role="alert" className="mb-4 text-sm text-amber-700">{error}</p>}
           {loading ? (
             <div className="space-y-4">
               {[1, 2, 3].map(i => (
@@ -436,15 +422,18 @@ function SessionNotesModal({ appointment, onClose, onSave }) {
  * My Patients tab — roster of everyone this doctor has treated,
  * with total sessions, last visit, and what was last discussed.
  */
-function PatientsView({ onOpenHistory }) {
-  const [patients, setPatients] = useState(null)
+function PatientsView({ onOpenHistory, revision }) {
   const [search, setSearch] = useState('')
-
+  const [query, setQuery] = useState({ search: '', page: 1 })
+  const { data, error, refresh, refreshing } = useApiSnapshot(doctorApi, '/doctor/patients', query)
+  const patients = data?.data || null
+  const pagination = data?.pagination
   useEffect(() => {
-    doctorApi.get('/doctor/patients')
-      .then(res => setPatients(res.data.data || []))
-      .catch(() => setPatients([]))
-  }, [])
+    const timer = setTimeout(() => setQuery(current => current.search === search.trim() ? current : { search: search.trim(), page: 1 }), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+  useEffect(() => { refresh() }, [revision, refresh])
+  if (error && !patients) return <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">{error}<button onClick={refresh} className="ml-3 font-semibold underline">Try again</button></div>
 
   if (patients === null) {
     return (
@@ -459,27 +448,24 @@ function PatientsView({ onOpenHistory }) {
     )
   }
 
-  const filtered = patients.filter(p =>
-    !search ||
-    p.patient.name?.toLowerCase().includes(search.toLowerCase()) ||
-    p.patient.phone?.includes(search) ||
-    p.patient.email?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = patients
 
   return (
     <div className="overflow-hidden rounded-[24px] border border-surface-100 bg-white shadow-sm">
-      <div className="px-6 sm:px-8 py-5 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center gap-3 justify-between bg-gradient-to-r from-gray-50 to-white">
+      <div className="px-6 sm:px-8 py-5 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center gap-3 justify-between bg-gray-50">
         <div>
           <h2 className="font-display font-bold text-gray-900 text-lg">My Patients</h2>
-          <p className="text-xs text-gray-500 mt-0.5">{patients.length} patient{patients.length !== 1 ? 's' : ''} under your care</p>
+          <p className="text-xs text-gray-500 mt-0.5">{pagination?.total ?? patients.length} patient{(pagination?.total ?? patients.length) !== 1 ? 's' : ''} under your care</p>
         </div>
         <div className="relative">
+          <label className="sr-only" htmlFor="roster-search">Search patients</label>
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" viewBox="0 0 16 16" fill="none">
             <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
             <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
           <input
             type="text"
+            id="roster-search"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search name, phone, email..."
@@ -497,8 +483,7 @@ function PatientsView({ onOpenHistory }) {
         <div className="divide-y divide-gray-100">
           {filtered.map((p, i) => (
             <div key={p.patient.id}
-              className="px-6 sm:px-8 py-5 hover:bg-brand-50/40 transition animate-fade-up opacity-0"
-              style={{ animationDelay: `${i * 40}ms`, animationFillMode: 'forwards' }}>
+              className="px-6 sm:px-8 py-5 hover:bg-brand-50/40 transition">
               <div className="flex flex-col lg:flex-row lg:items-center gap-4">
                 {/* Identity */}
                 <div className="flex items-center gap-3 lg:w-64 flex-shrink-0">
@@ -568,302 +553,186 @@ function PatientsView({ onOpenHistory }) {
           ))}
         </div>
       )}
+      {error && <p role="alert" className="px-6 py-3 text-xs text-amber-700">{error}</p>}
+      <div className="flex items-center justify-between gap-3 border-t border-gray-100 px-6 py-4 text-xs text-gray-500">
+        <span>{refreshing ? 'Updating…' : `Page ${query.page} of ${Math.max(1, pagination?.pages || 1)}`}</span>
+        <div className="flex gap-3"><button disabled={query.page <= 1} onClick={() => setQuery(q => ({ ...q, page: q.page - 1 }))} className="rounded-lg border px-3 py-2 font-semibold disabled:opacity-30">Previous</button><button disabled={query.page >= (pagination?.pages || 1)} onClick={() => setQuery(q => ({ ...q, page: q.page + 1 }))} className="rounded-lg border px-3 py-2 font-semibold disabled:opacity-30">Next</button></div>
+      </div>
     </div>
   )
+}
+
+function DashboardIcon({ name, className = 'h-5 w-5' }) {
+  const paths = {
+    calendar: <><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M7 3v4m10-4v4M3 11h18" /></>,
+    search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></>,
+    refresh: <><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1" /></>,
+    check: <path d="m5 12 4 4L19 6" />,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    arrow: <path d="M5 12h14m-5-5 5 5-5 5" />,
+    notes: <><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8m-8 4h5" /></>,
+  }
+  return <svg aria-hidden="true" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
 }
 
 export default function DoctorDashboard() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [view, setView] = useState('schedule') // 'schedule' | 'patients'
+  const [view, setView] = useState('schedule')
   const [selectedDate, setSelectedDate] = useState(localDateStr())
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [search, setSearch] = useState('')
   const [updating, setUpdating] = useState(null)
   const [notesModal, setNotesModal] = useState(null)
   const [patientHistoryModal, setPatientHistoryModal] = useState(null)
+  const [revision, setRevision] = useState(0)
+  const [notice, setNotice] = useState(null)
+  const [socketReason, setSocketReason] = useState(null)
+  const [actionError, setActionError] = useState('')
+  const [recentIds, setRecentIds] = useState(new Set())
+  const [clock, setClock] = useState(new Date())
+  const timers = useRef(new Map())
   const navigate = useNavigate()
+  const { data, loading, refreshing, error, errorDetails, updatedAt, refresh } = useDoctorSchedule(selectedDate)
+  const doctor = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('doctor') || '{}') }
+    catch { return {} }
+  }, [])
 
-  const doctor = JSON.parse(localStorage.getItem('doctor') || '{}')
-
-  useEffect(() => {
-    if (doctor.first_login) {
-      navigate('/doctor/change-password', { replace: true })
-    }
-  }, [doctor.first_login, navigate])
-
-  const fetchAppointments = async (date) => {
-    setLoading(true)
-    try {
-      const res = await doctorApi.get(`/doctor/appointments?date=${date}`)
-      setData(res.data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { fetchAppointments(selectedDate) }, [selectedDate])
-
-  const handleStatusUpdate = async (appointmentId, status) => {
-    setUpdating(appointmentId)
-    try {
-      await doctorApi.patch(`/doctor/appointments/${appointmentId}/status`, { status })
-      fetchAppointments(selectedDate)
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update status.')
-    } finally {
-      setUpdating(null)
-    }
-  }
-
-  // Generate today + next 6 days for date selector (local time)
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() + i)
-    return localDateStr(d)
+  const liveStatus = useAppointmentRealtime({
+    onAccessDenied: setSocketReason,
+    onResync: () => { refresh(); setRevision(r => r + 1) },
+    onChange: event => {
+      setRevision(r => r + 1)
+      if (event.date === selectedDate || event.previousDate === selectedDate) refresh()
+      if (['booked', 'rescheduled', 'cancelled'].includes(event.type)) setNotice(event)
+      if (event.type === 'booked') {
+        setRecentIds(ids => new Set([...ids, event.appointmentId]))
+        clearTimeout(timers.current.get(event.appointmentId))
+        timers.current.set(event.appointmentId, setTimeout(() => {
+          setRecentIds(ids => { const next = new Set(ids); next.delete(event.appointmentId); return next })
+          timers.current.delete(event.appointmentId)
+        }, 15_000))
+      }
+    },
   })
 
-  const todayStr = localDateStr()
-  const isToday = selectedDate === todayStr
+  useEffect(() => {
+    if (doctor.first_login) navigate('/doctor/change-password', { replace: true })
+  }, [doctor.first_login, navigate])
+  useEffect(() => {
+    // Local time affects "Up next"; this timer makes no network requests.
+    const timer = setInterval(() => setClock(new Date()), 30_000)
+    return () => { clearInterval(timer); timers.current.forEach(clearTimeout) }
+  }, [])
+  const handleStatusUpdate = async (appointmentId, status) => {
+    setUpdating(appointmentId)
+    setActionError('')
+    try {
+      await doctorApi.patch(`/doctor/appointments/${appointmentId}/status`, { status })
+      refresh()
+      setRevision(r => r + 1)
+    } catch (err) { setActionError(err.response?.data?.message || 'Could not update this appointment. Please try again.') }
+    finally { setUpdating(null) }
+  }
+  const appointments = data?.summary?.data || []
+  const visibleAppointments = appointments.filter(appt => {
+    const query = search.trim().toLowerCase()
+    return (statusFilter === 'all' || appt.status === statusFilter) &&
+      (!query || `${appt.patient?.name || ''} ${appt.patient?.phone || ''} ${appt.patient?.email || ''}`.toLowerCase().includes(query))
+  })
+  const today = localDateStr(clock)
+  const isToday = selectedDate === today
+  const nowHm = `${String(clock.getHours()).padStart(2, '0')}:${String(clock.getMinutes()).padStart(2, '0')}`
+  const upcoming = appointments.find(a => a.status === 'confirmed' && (!isToday || a.appointment_time.slice(0, 5) >= nowHm))
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const d = new Date(`${selectedDate}T12:00:00`)
+    d.setDate(d.getDate() - 2 + index)
+    return localDateStr(d)
+  })
+  const showNotice = () => {
+    if (notice.date) setSelectedDate(notice.date)
+    setView('schedule'); setSearch(''); setStatusFilter('all'); refresh(); setNotice(null)
+  }
+  const summary = data?.summary
+  const accessIssue = doctorAccessIssue({ liveStatus, errorDetails, socketReason })
+  const blocked = !!accessIssue
+  const button = 'rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-600 transition hover:border-brand-300 hover:text-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 disabled:opacity-40'
 
   return (
-    <div className="flex min-h-screen bg-surface-50">
+    <div className="staff-workspace doctor-workspace flex min-h-screen">
       <DoctorSidebar />
-
-      <main className="flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
-        {/* Header */}
-        <div className="mb-10">
-          <h1 className="font-display text-4xl font-semibold text-ink-900">
-            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, Dr. {doctor.fullName?.split(' ')[0]}
-          </h1>
-          <p className="text-gray-600 text-lg mt-2">
-            {view === 'patients'
-              ? 'Your patients, their sessions, and what you last discussed'
-              : isToday ? "Here's your schedule for today" : `Appointments for ${new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`}
-          </p>
-        </div>
-
-        {/* View switcher */}
-        <div className="mb-8 inline-flex rounded-2xl border border-gray-200 bg-white p-1 shadow-sm">
-          {[
-            { key: 'schedule', label: 'Schedule' },
-            { key: 'patients', label: 'My Patients' },
-          ].map(t => (
-            <button
-              key={t.key}
-              onClick={() => setView(t.key)}
-              className={`px-6 py-2.5 rounded-xl text-sm font-bold transition
-                ${view === t.key ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/20' : 'text-gray-500 hover:text-gray-800'}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {view === 'patients' && (
-          <PatientsView onOpenHistory={(patient) => setPatientHistoryModal(patient)} />
-        )}
-
-        {view === 'schedule' && (<>
-        {/* Date Selector */}
-        <div className="flex items-center gap-3 mb-8 overflow-x-auto pb-2 scrollbar-hide">
-          {days.map(day => {
-            const d = new Date(`${day}T00:00:00`)
-            const isActive = selectedDate === day
-            return (
-              <button key={day} onClick={() => setSelectedDate(day)}
-                className={`flex-shrink-0 flex flex-col items-center gap-1.5 px-4 py-3 rounded-2xl border-2 text-sm transition-all font-semibold
-                  ${isActive ? 'bg-brand-600 border-brand-600 text-white shadow-lg shadow-brand-600/30' : 'bg-white border-gray-200 text-gray-700 hover:border-brand-300 hover:bg-brand-50'}`}>
-                <span className="text-xs opacity-75">{d.toLocaleDateString('en-US', { weekday: 'short' })}</span>
-                <span className="text-lg leading-tight">{d.getDate()}</span>
-                {day === todayStr && <span className={`text-xs ${isActive ? 'opacity-75' : 'text-brand-600 font-bold'}`}>Today</span>}
-              </button>
-            )
-          })}
-          {/* Jump to any upcoming date */}
-          <div className="flex-shrink-0 flex flex-col items-center gap-1 pl-2">
-            <label className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Jump to date</label>
-            <input
-              type="date"
-              min={todayStr}
-              value={selectedDate}
-              onChange={e => e.target.value && setSelectedDate(e.target.value)}
-              className={`rounded-2xl border-2 px-3 py-2.5 text-sm font-semibold transition
-                ${!days.includes(selectedDate) ? 'border-brand-600 text-brand-700 bg-brand-50' : 'border-gray-200 text-gray-700 bg-white'}`}
-            />
-          </div>
-        </div>
-
-        {/* Up next — first confirmed appointment still ahead of now */}
-        {isToday && (() => {
-          const nowHm = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`
-          const next = data?.summary?.data?.find(a => a.status === 'confirmed' && a.appointment_time >= nowHm)
-          if (!next) return null
-          return (
-            <div className="mb-6 flex items-center gap-4 rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50 to-white p-5 shadow-sm">
-              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-md shadow-brand-600/25">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <circle cx="10" cy="10" r="7.5" />
-                  <path d="M10 6v4l2.5 2.5" strokeLinecap="round" />
-                </svg>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-brand-600">Up next</p>
-                <p className="truncate font-semibold text-ink-900">
-                  {formatTime(next.appointment_time)} — {next.patient?.name}
-                </p>
-                {next.notes && <p className="truncate text-xs text-gray-500">{next.notes}</p>}
-              </div>
-              <button
-                onClick={() => setPatientHistoryModal(next.patient)}
-                className="flex-shrink-0 rounded-full border border-brand-200 bg-white px-4 py-2 text-xs font-bold text-brand-700 transition hover:bg-brand-50"
-              >
-                View history
-              </button>
+      <main className="staff-content min-w-0 flex-1 px-4 pb-10 pt-20 sm:px-7 md:pt-8 xl:px-10">
+        <div className="mx-auto max-w-7xl">
+          <header className="staff-heading">
+            <div>
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-brand-600">Doctor dashboard</p>
+              <h1 className="font-display text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">Good {clock.getHours() < 12 ? 'morning' : clock.getHours() < 17 ? 'afternoon' : 'evening'}, Dr. {doctor.fullName?.split(' ')[0] || 'Doctor'}.</h1>
+              <p className="mt-2 text-sm text-gray-500">{clock.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
             </div>
-          )
-        })()}
+            <div className="flex items-center gap-2 pt-1"><LiveStatus status={errorDetails?.subscription_expired || socketReason === 'subscription_expired' ? 'subscription_expired' : liveStatus} /><button className={button} aria-label="Refresh dashboard" title="Refresh dashboard" onClick={() => { refresh(); setRevision(r => r + 1) }} disabled={refreshing || blocked}><DashboardIcon name="refresh" className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /></button></div>
+          </header>
 
-        {/* Stats */}
-        {data && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <StatCard label="Appointments" value={data.summary.total} color="blue"
-              icon={<svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="14" height="13" rx="2"/><path d="M7 2.5v3M13 2.5v3M3 8.5h14" strokeLinecap="round"/></svg>} />
-            <StatCard label="Pending" value={data.summary.pending} color="gray"
-              icon={<svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="10" cy="10" r="7.5"/><path d="M10 6v4l2.5 2.5" strokeLinecap="round"/></svg>} />
-            <StatCard label="Completed" value={data.summary.completed} color="green"
-              icon={<svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="10" cy="10" r="7.5"/><path d="M6.5 10l2.5 2.5 4.5-5" strokeLinecap="round" strokeLinejoin="round"/></svg>} />
-            <StatCard label="No Show" value={data.summary.no_show} color="amber"
-              icon={<svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="10" cy="10" r="7.5"/><path d="M7 7l6 6M13 7l-6 6" strokeLinecap="round"/></svg>} />
-          </div>
-        )}
+          {accessIssue && <div role="alert" className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="font-semibold">{accessIssue.title}</p><p className="mt-1">{accessIssue.message}</p>{accessIssue.signIn ? <a href="/doctor/login" className="mt-3 inline-flex min-h-11 items-center font-semibold underline">Sign in again</a> : <button onClick={() => window.location.reload()} className="mt-2 font-semibold underline">Check access again</button>}</div>}
+          {liveStatus === 'reconnecting' && <p role="status" className="mb-4 text-xs text-amber-700">Reconnecting to live updates. Your schedule will catch up automatically.</p>}
+          {notice && <div role="status" aria-live="polite" className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-brand-600"><DashboardIcon name="calendar" /></span>
+            <div className="flex-1"><p className="font-semibold">{notice.type === 'booked' ? 'New appointment booked' : notice.type === 'cancelled' ? 'An appointment was cancelled' : 'An appointment was rescheduled'}</p><p className="mt-0.5 text-xs text-brand-700">{formatDate(notice.date)} · Your schedule updates automatically.</p></div>
+            <button onClick={showNotice} className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-brand-700">{notice.date === selectedDate ? 'Show schedule' : 'View date'}</button>
+            <button aria-label="Dismiss notification" onClick={() => setNotice(null)} className="rounded-lg px-2 py-1 text-xl text-brand-500">×</button>
+          </div>}
+          {!accessIssue && (error || actionError) && <div role="alert" className="mb-5 flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><span>{actionError || error}{data && error ? ' Showing your last loaded schedule.' : ''}</span><button className="font-semibold underline" onClick={() => { setActionError(''); refresh() }}>Try again</button></div>}
 
-        {/* Appointments List */}
-        <div className="overflow-hidden rounded-[24px] border border-surface-100 bg-white shadow-sm">
-          <div className="px-6 sm:px-8 py-5 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-gray-50 to-white">
-            <h2 className="font-display font-bold text-gray-900 text-lg">Appointments</h2>
-            {data && <span className="text-sm text-gray-500 font-semibold">{data.summary.total} total</span>}
+          {!accessIssue && <>
+          <div className="mb-6 flex items-center justify-between border-b border-gray-200">
+            <div className="flex gap-6" aria-label="Dashboard views">
+              {['schedule', 'patients'].map(tab => <button key={tab} onClick={() => setView(tab)} aria-pressed={view === tab} className={`border-b-2 px-1 pb-3 text-sm font-semibold transition ${view === tab ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-400 hover:text-gray-700'}`}>{tab === 'schedule' ? 'My schedule' : 'My patients'}</button>)}
+            </div>
+            <span className="hidden pb-3 text-[11px] text-gray-400 sm:block">{updatedAt ? `Schedule synced ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Loading your schedule'}</span>
           </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-20 text-gray-400">
-              <div className="text-center">
-                <svg className="animate-spin w-8 h-8 mx-auto mb-3" viewBox="0 0 16 16" fill="none">
-                  <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
-                  <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-                <p className="font-medium">Loading appointments...</p>
-              </div>
-            </div>
-          ) : !(data?.summary?.data?.length) ? (
-            <div className="text-center py-20 text-gray-400">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-surface-100 text-gray-300">
-                <svg width="26" height="26" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="3" y="4" width="14" height="13" rx="2"/>
-                  <path d="M7 2.5v3M13 2.5v3M3 8.5h14" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <p className="font-bold text-lg text-gray-500">No appointments scheduled</p>
-              <p className="text-sm mt-1">You're free on this day</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {data.summary.data.map((appt, i) => (
-                <div key={appt.id}
-                  className="px-6 sm:px-8 py-5 flex flex-col sm:flex-row sm:items-center gap-4 hover:bg-blue-50 transition animate-fade-up opacity-0"
-                  style={{ animationDelay: `${i * 50}ms`, animationFillMode: 'forwards' }}>
+          {view === 'patients' ? <PatientsView revision={revision} onOpenHistory={setPatientHistoryModal} /> : <>
+            <section className="mb-6 grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Day summary">
+              {[
+                ['Appointments', summary?.total, 'calendar', 'blue'],
+                ['Awaiting visit', summary?.pending, 'clock', 'amber'],
+                ['Completed', summary?.completed, 'check', 'green'],
+                ['No-show', summary?.no_show, 'calendar', 'violet'],
+              ].map(([label, value, icon, tone]) => <MetricCard key={label} label={label} value={value} tone={tone} sub={isToday ? 'Today' : formatDate(selectedDate)} icon={<DashboardIcon name={icon} className="h-5 w-5" />} />)}
+            </section>
 
-                  {/* Time Badge */}
-                  <div className="flex-shrink-0">
-                  <div className="rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-center">
-                      <p className="text-lg font-bold text-brand-700">{formatTime(appt.appointment_time)}</p>
-                      <p className="text-xs text-brand-600 font-semibold mt-1">Scheduled</p>
-                    </div>
-                  </div>
-
-                  {/* Patient Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-base font-bold text-gray-900">{appt.patient.name}</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {appt.patient.phone} {appt.notes && `• ${appt.notes}`}
-                    </p>
-                  </div>
-
-                  {/* Status */}
-                  <div className="flex-shrink-0">
-                    <StatusBadge status={appt.status} />
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2 flex-shrink-0">
-                    {/* Session Notes button — always shown */}
-                    <button
-                      onClick={() => setNotesModal(appt)}
-                      className="px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 text-sm font-bold rounded-lg border-2 border-purple-200 transition shadow-sm hover:shadow-md flex items-center gap-1.5"
-                      title="Add / View session notes"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                        <path d="M3 2h8l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5"/>
-                        <path d="M11 2v3h3M5 9h6M5 11h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                      </svg>
-                      Notes
-                    </button>
-
-                    {/* View Patient History button */}
-                    <button
-                      onClick={() => setPatientHistoryModal(appt.patient)}
-                      className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-bold rounded-lg border-2 border-blue-200 transition shadow-sm hover:shadow-md flex items-center gap-1.5"
-                      title="View patient history"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                        <path d="M3 2h8l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5"/>
-                        <path d="M5 9h6M5 11h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                      </svg>
-                      History
-                    </button>
-
-                    {appt.status === 'confirmed' && (
-                      <>
-                        <button
-                          onClick={() => handleStatusUpdate(appt.id, 'completed')}
-                          disabled={updating === appt.id}
-                          className="px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 text-sm font-bold rounded-lg border-2 border-green-200 transition disabled:opacity-50 shadow-sm hover:shadow-md">
-                          {updating === appt.id ? '...' : 'Mark done'}
-                        </button>
-                        <button
-                          onClick={() => handleStatusUpdate(appt.id, 'no_show')}
-                          disabled={updating === appt.id}
-                          className="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-sm font-bold rounded-lg border-2 border-amber-200 transition disabled:opacity-50 shadow-sm hover:shadow-md">
-                          No Show
-                        </button>
-                      </>
-                    )}
-                  </div>
+            <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+              <section className="min-w-0 overflow-hidden rounded-2xl border border-gray-200/80 bg-white">
+                <div className="border-b border-gray-100 p-4 sm:p-5">
+                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold text-ink-900">{isToday ? 'Today’s appointments' : 'Your appointments'}</h2><p className="mt-1 text-xs text-gray-400">{formatDate(selectedDate)}</p></div><div className="flex items-center gap-2"><button className={button} onClick={() => setSelectedDate(today)}>Today</button><label className="sr-only" htmlFor="schedule-date">Choose appointment date</label><input id="schedule-date" type="date" value={selectedDate} onChange={e => e.target.value && setSelectedDate(e.target.value)} className="min-w-0 rounded-xl border border-gray-200 bg-white px-2 py-2.5 text-xs text-gray-600" /></div></div>
+                  <div className="grid grid-cols-7 gap-1.5" aria-label="Appointment dates">{days.map(day => {
+                    const date = new Date(`${day}T12:00:00`)
+                    return <button key={day} onClick={() => setSelectedDate(day)} aria-pressed={day === selectedDate} className={`rounded-xl py-3 text-center transition ${day === selectedDate ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}><span className="block text-[10px] uppercase tracking-wide opacity-75">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span><span className="mt-1 block text-lg font-semibold">{date.getDate()}</span><span className={`mx-auto mt-1 block h-1 w-1 rounded-full ${day === today ? day === selectedDate ? 'bg-white' : 'bg-brand-500' : 'bg-transparent'}`} /></button>
+                  })}</div>
                 </div>
-              ))}
+                <div className="border-b border-gray-100 p-4 sm:px-5">
+                  <div className="relative mb-3"><DashboardIcon name="search" className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-gray-400" /><input value={search} onChange={e => setSearch(e.target.value)} aria-label="Search appointments" placeholder="Find a patient by name, phone or email" className="w-full rounded-xl border border-gray-200 bg-gray-50/50 py-2.5 pl-10 pr-3 text-xs focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100" /></div>
+                  <div className="flex flex-wrap items-center gap-1.5">{[['all', 'All'], ['confirmed', 'Awaiting'], ['completed', 'Completed'], ['no_show', 'No-show']].map(([value, label]) => <button key={value} onClick={() => setStatusFilter(value)} aria-pressed={statusFilter === value} className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${statusFilter === value ? 'bg-ink-900 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>{label}</button>)}<span className="ml-auto text-[11px] text-gray-400">{refreshing && !loading ? 'Updating…' : `${visibleAppointments.length} shown`}</span></div>
+                </div>
+
+                {loading && !data ? <div className="space-y-5 p-6" role="status" aria-label="Loading appointments">{[1, 2, 3].map(i => <div key={i} className="flex gap-4 motion-safe:animate-pulse"><div className="h-14 w-16 rounded-xl bg-gray-100" /><div className="flex-1 py-1"><div className="mb-3 h-3 w-2/5 rounded bg-gray-100" /><div className="h-2.5 w-3/5 rounded bg-gray-50" /></div></div>)}</div>
+                  : !visibleAppointments.length ? <div className="px-6 py-16 text-center"><div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-500"><DashboardIcon name="calendar" /></div><p className="font-semibold text-gray-800">{error && !data ? 'Schedule unavailable' : appointments.length ? 'No matching appointments' : 'A little breathing room'}</p><p className="mx-auto mt-2 max-w-xs text-xs leading-6 text-gray-400">{error && !data ? 'Please retry when the connection is available.' : appointments.length ? 'Try a different name or status filter.' : 'There are no appointments for this day. New bookings will appear here automatically.'}</p>{appointments.length > 0 && <button onClick={() => { setSearch(''); setStatusFilter('all') }} className="mt-3 text-xs font-semibold text-brand-600">Clear filters</button>}</div>
+                  : <div className="divide-y divide-gray-100">{visibleAppointments.map(appt => <article key={appt.id} className={`p-4 transition-colors duration-500 sm:p-5 ${recentIds.has(appt.id) ? 'bg-emerald-50 ring-1 ring-inset ring-emerald-200' : 'hover:bg-gray-50/50'}`}>
+                    <div className="flex items-start gap-3 sm:gap-4"><div className="w-20 flex-shrink-0 pt-1 sm:w-24"><p className="text-[17px] font-bold text-ink-900">{formatTime(appt.appointment_time)}</p><p className="mt-1 text-[10px] text-gray-400">Scheduled</p></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-semibold text-gray-800">{appt.patient?.name || 'Patient'}</h3>{recentIds.has(appt.id) && <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-700">New</span>}</div><p className="mt-1 truncate text-xs text-gray-400">{appt.patient?.phone || appt.patient?.email || 'No contact on file'}</p>{appt.notes && <p className="mt-2 line-clamp-2 text-xs leading-5 text-gray-500">{appt.notes}</p>}</div><StatusBadge status={appt.status} /></div>
+                    <div className="mt-4 flex flex-wrap items-center gap-2 sm:ml-20"><button onClick={() => setNotesModal(appt)} className={button}>Session notes</button><button onClick={() => setPatientHistoryModal(appt.patient)} disabled={!appt.patient?.id} className={button}>History</button>{appt.status === 'confirmed' && <><button disabled={updating !== null || blocked} onClick={() => handleStatusUpdate(appt.id, 'completed')} className="ml-auto rounded-xl bg-brand-600 px-3.5 py-2.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-40">{updating === appt.id ? 'Saving…' : 'Mark complete'}</button><button disabled={updating !== null || blocked} onClick={() => handleStatusUpdate(appt.id, 'no_show')} className={button}>No-show</button></>}</div>
+                  </article>)}</div>}
+              </section>
+
+              <aside className="space-y-4">
+                <div className="overflow-hidden rounded-2xl staff-next bg-[#153e50] p-6 text-white"><div className="mb-5 flex items-center justify-between"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">{isToday ? 'Up next' : 'First appointment'}</p><DashboardIcon name="clock" className="h-4 w-4 text-white/50" /></div>{upcoming && selectedDate >= today ? <><p className="font-display text-3xl">{formatTime(upcoming.appointment_time)}</p><div className="my-5 h-px bg-white/10" /><p className="text-lg font-semibold">{upcoming.patient?.name}</p><p className="mt-1 text-xs text-white/50">{upcoming.patient?.phone || 'Confirmed appointment'}</p>{upcoming.notes && <p className="mt-4 text-xs leading-6 text-white/70">{upcoming.notes}</p>}<button onClick={() => setNotesModal(upcoming)} className="mt-6 flex w-full items-center justify-between rounded-xl bg-white/10 px-4 py-3 text-xs font-semibold transition hover:bg-white/20">Open session notes<DashboardIcon name="arrow" className="h-4 w-4" /></button></> : <><p className="font-display text-2xl">{selectedDate < today ? 'Past appointments' : 'No upcoming appointments'}</p><p className="mt-3 text-xs leading-6 text-white/60">{selectedDate < today ? 'Review completed visits and patient notes from this day.' : 'No upcoming visits on this day. Your next booking will appear in the schedule.'}</p></>}</div>
+                <div className="staff-progress rounded-2xl border border-gray-200/80 bg-white p-5"><h3 className="text-xs font-semibold text-gray-700">Day progress</h3><div className="mb-3 mt-4 flex items-end justify-between"><span className="text-2xl font-semibold text-ink-900">{summary?.completed || 0}<span className="text-sm font-normal text-gray-400"> / {summary?.total || 0}</span></span><span className="text-[11px] text-gray-400">completed</span></div><div role="progressbar" aria-label="Completed appointments" aria-valuemin={0} aria-valuemax={summary?.total || 0} aria-valuenow={summary?.completed || 0} className="h-1.5 overflow-hidden rounded-full bg-gray-100"><div className="h-full rounded-full bg-brand-500 transition-all" style={{ width: `${summary?.total ? (summary.completed / summary.total) * 100 : 0}%` }} /></div><p className="mt-3 text-[11px] leading-5 text-gray-400">{summary?.pending || 0} visit{summary?.pending === 1 ? '' : 's'} awaiting completion.</p></div>
+                <p className="px-2 text-[11px] leading-5 text-gray-400">Bookings update automatically while this dashboard is open. You can keep taking notes without interruption.</p>
+              </aside>
             </div>
-          )}
+          </>}
+          </>}
         </div>
-        </>)}
       </main>
-
-      {/* Session Notes Modal */}
-      {notesModal && (
-        <SessionNotesModal
-          appointment={notesModal}
-          onClose={() => setNotesModal(null)}
-          onSave={() => fetchAppointments(selectedDate)}
-        />
-      )}
-
-      {/* Patient History Modal */}
-      {patientHistoryModal && (
-        <PatientHistoryModal
-          patient={patientHistoryModal}
-          onClose={() => setPatientHistoryModal(null)}
-        />
-      )}
+      {notesModal && <SessionNotesModal appointment={notesModal} onClose={() => setNotesModal(null)} onSave={() => { refresh(); setRevision(r => r + 1) }} />}
+      {patientHistoryModal && <PatientHistoryModal patient={patientHistoryModal} revision={revision} onClose={() => setPatientHistoryModal(null)} />}
     </div>
   )
 }
-

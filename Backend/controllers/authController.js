@@ -68,12 +68,13 @@ export const requestOtp = async (req, res) => {
       })
     }
 
-    // Delete any existing OTPs for this contact (prevent flooding)
+    // Replace this clinic's code without invalidating another clinic's code.
     await supabase
       .from("otp_verifications")
       .delete()
       .eq("contact_value", contact_value)
       .eq("contact_type", contact_type)
+      .eq("clinic_id", clinicId)
 
     const otp = generateOtp()
     const otpHash = hashOtp(otp)
@@ -139,12 +140,18 @@ export const verifyOtp = async (req, res) => {
       })
     }
 
+    const clinicId = req.tenant?.id
+    if (!clinicId) {
+      return res.status(400).json({ success: false, message: "Clinic context is required." })
+    }
+
     // Find the latest unverified OTP for this contact
     const { data: record, error: fetchError } = await supabase
       .from("otp_verifications")
       .select("*")
       .eq("contact_value", contact_value)
       .eq("contact_type", contact_type)
+      .eq("clinic_id", clinicId)
       .is("verified_at", null)
       .order("created_at", { ascending: false })
       .limit(1)

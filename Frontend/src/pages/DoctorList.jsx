@@ -16,12 +16,11 @@ function initialsOf(name) {
 
 const DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-// Real availability from the doctor's actual weekly schedule — no
-// fabricated times. Returns null when no schedule has been set yet.
+// Regular consultation days; actual slot availability is checked during booking.
 function availabilityOf(doctor) {
   if (!doctor.working_days?.length) return null
   const today = DAY_ABBR[new Date().getDay()]
-  if (doctor.working_days.includes(today)) return { today: true, label: 'Available today' }
+  if (doctor.working_days.includes(today)) return { today: true, label: `Consults on ${today}` }
   return { today: false, label: `Consults ${doctor.working_days.join(', ')}` }
 }
 
@@ -43,12 +42,12 @@ function DoctorRow({ doctor, clinicName, onBook, animDelay }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-display text-xl font-semibold text-ink-900">
-              Dr. {doctor.full_name || doctor.fullName}
+              {/^dr\.?\s/i.test(doctor.full_name || doctor.fullName || '') ? (doctor.full_name || doctor.fullName) : `Dr. ${doctor.full_name || doctor.fullName || 'Doctor'}`}
             </h3>
             {availability?.today && doctor.is_active && (
               <span className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                Available today
+                {availability.label}
               </span>
             )}
             {!doctor.is_active && (
@@ -63,14 +62,14 @@ function DoctorRow({ doctor, clinicName, onBook, animDelay }) {
             )}
           </div>
           <p className="mt-0.5 text-sm font-semibold text-brand-600">
-            {doctor.specialization || 'General Physician'}
+            {doctor.specialization || 'Specialty not listed'}
           </p>
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-gray-600">
             <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
               <path d="M6 1C3.8 1 2 2.8 2 5c0 2.8 4 6 4 6s4-3.2 4-6c0-2.2-1.8-4-4-4z" stroke="currentColor" strokeWidth="1.2" />
               <circle cx="6" cy="5" r="1.4" stroke="currentColor" strokeWidth="1.2" />
             </svg>
-            {doctor.qualification || 'MBBS'} · {clinicName}
+            {doctor.qualification ? `${doctor.qualification} · ` : ''}{clinicName}
           </p>
           {availability && !availability.today && (
             <p className="mt-1 text-xs font-medium text-gray-500">{availability.label}</p>
@@ -98,6 +97,8 @@ function DoctorRow({ doctor, clinicName, onBook, animDelay }) {
 export default function DoctorList() {
   const [doctors, setDoctors] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('All')
   const navigate = useNavigate()
@@ -106,11 +107,19 @@ export default function DoctorList() {
   const contact = localStorage.getItem('otp_contact') || ''
 
   useEffect(() => {
-    api.get('/doctors')
-      .then(res => setDoctors(res.data.data || res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [])
+    const controller = new AbortController()
+    setLoading(true)
+    setLoadError(false)
+    api.get('/doctors', { signal: controller.signal, timeout: 30_000 })
+      .then(res => {
+        const records = res.data.data || res.data
+        if (!Array.isArray(records)) throw new Error('Invalid doctor response')
+        if (!controller.signal.aborted) setDoctors(records)
+      })
+      .catch(() => { if (!controller.signal.aborted) setLoadError(true) })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
+  }, [attempt])
 
   const specializations = ['All', ...new Set(doctors.map(d => d.specialization).filter(Boolean))]
 
@@ -126,7 +135,7 @@ export default function DoctorList() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-50">
+    <div className="patient-booking min-h-screen bg-surface-50">
       <header className="sticky top-0 z-40 border-b border-white/70 bg-white/80 px-6 py-4 backdrop-blur-xl sm:px-8">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Logo showClinicName />
@@ -176,6 +185,7 @@ export default function DoctorList() {
               </svg>
               <input
                 type="text"
+                aria-label="Search doctors by name or specialty"
                 placeholder="Search by doctor name or specialty..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -189,6 +199,7 @@ export default function DoctorList() {
                 <button
                   key={spec}
                   onClick={() => setFilter(spec)}
+                  aria-pressed={filter === spec}
                   className={`rounded-full border px-4 py-2 text-sm font-semibold transition-all
                     ${filter === spec
                       ? 'border-brand-600 bg-brand-600 text-white shadow-md shadow-brand-600/20'
@@ -214,6 +225,12 @@ export default function DoctorList() {
                     </div>
                   </div>
                 ))}
+              </div>
+            ) : loadError ? (
+              <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+                <h2 className="font-semibold">Doctor details could not be loaded</h2>
+                <p className="mt-2 text-sm text-gray-700">Please try again to see the latest doctors and continue booking.</p>
+                <button type="button" className="clinic-primary mt-4" onClick={() => setAttempt(value => value + 1)}>Try again</button>
               </div>
             ) : filtered.length === 0 ? (
               <div className="rounded-[24px] border border-surface-100 bg-white py-20 text-center text-gray-500">
@@ -272,14 +289,14 @@ export default function DoctorList() {
             {/* Trust card */}
             <div className="rounded-[24px] border border-surface-100 bg-white p-6 shadow-sm animate-fade-up delay-150">
               <p className="mb-4 font-display text-sm font-semibold uppercase tracking-[0.18em] text-ink-900">
-                Why patients trust us
+                What to expect
               </p>
               <ul className="space-y-3">
                 {[
-                  'OTP-verified, secure booking',
-                  'Instant confirmation by email or SMS',
-                  'Free cancellation & reschedule links',
-                  'Your records stay with this clinic',
+                  'Email verification with a one-time code',
+                  'Review your details before confirming',
+                  'Confirmation with appointment details',
+                  'Links to manage your appointment',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-sm text-gray-600">
                     <svg className="mt-0.5 flex-shrink-0" width="15" height="15" viewBox="0 0 14 14" fill="none">

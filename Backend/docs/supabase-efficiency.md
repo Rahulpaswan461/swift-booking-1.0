@@ -1,0 +1,32 @@
+# Supabase storage and processing review
+
+These findings come from application code and local migration files. No production database was queried or modified. Live table sizes and query statistics are needed to attribute the warning; run `supabase-diagnostics.sql` in the Supabase SQL Editor and check Database Health and the exact usage limit in the dashboard.
+
+## Findings and changes
+
+- **Unbounded platform metrics:** `platformController.js` downloaded all doctors and appointments, then filtered them separately for every clinic. This transferred historical rows on every refresh, did repeated work in JavaScript, and silently undercounted once Supabase's Data API row limit was reached. Migration 016 adds a service-role-only RPC that aggregates each table once in SQL. The backend shares concurrent requests and caches the platform snapshot for 30 seconds. Exact lifetime counts still require reading history; measure the new query before choosing precomputed counters at larger scale.
+- **Dashboard count truncation:** the admin dashboard fetched all clinic appointment patient IDs just to count distinct patients, plus today's and this week's individual rows. A SQL RPC now calculates the same response shape without raw row downloads. This week's range now ends at the next Monday; it previously included every future appointment after the current Monday. Database errors now surface instead of turning into zero counts.
+- **Cartesian multiplication:** migration 005's `v_clinic_dashboard` joined raw doctors, patients and appointments by clinic. A clinic with 5 doctors, 1,000 patients and 10,000 appointments could generate 50 million intermediate rows. `COUNT(DISTINCT ...)` hid the multiplication for counts but revenue was multiplied. Migration 016 aggregates the three tables separately. The view is not referenced by this backend, so its production impact depends on external/dashboard usage.
+- **Audit growth:** the middleware wrote a row for every mutating response, including invalid OTP attempts and other errors, and ignored its calculated success flag. It now logs successful completed mutations, excludes patient OTP traffic, stores details as a JSON object instead of a JSON string, bounds user-agent size and checks database insert errors. Existing audit history is preserved. Failed access attempts still use application logs; if you need durable security-event history, add a separately bounded policy.
+- **Expired codes accumulate:** OTPs were removed only when the same contact requested another or submitted an expired code. Password reset rows were never cleaned. An hourly scheduler now calls a bounded cleanup RPC, deleting at most 1,000 rows per authentication table per run, only when expired for over one day. A database advisory lock avoids overlapping batches across instances. It does not delete clinical, payment, appointment-event or audit records. Set `ENABLE_DB_MAINTENANCE=false` if scheduling this RPC externally.
+- **Indexes:** adds indexes for clinic/date dashboard lookups, tomorrow's outstanding reminders, expired OTP cleanup, clinic/contact OTP lookup and reset-request throttling. Drops the duplicate audit action index from 015 only when the PostgreSQL catalog verifies equivalence with 005. Indexes also consume disk: use the diagnostic size/usage report before removing any other index.
+- **Tenant OTP lookup:** replacement and verification now include `clinic_id`; previously one clinic's OTP request could erase another clinic's code for the same contact. Patient identity behavior otherwise remains unchanged.
+- **Schema versioning:** `.gitignore` previously excluded the migrations directory. Migrations are now visible to Git so the new RPCs can be shipped with their backend callers.
+
+No Supabase Storage bucket upload calls, realtime subscriptions or continuous dashboard polling were found in the application. That does not establish which Supabase usage category caused your warning.
+
+## Deployment
+
+1. Run the read-only diagnostics and save the results, particularly table/index sizes and slow queries.
+2. Apply `Backend/migrations/016_database_efficiency.sql` to the existing database **before deploying this backend**. It expects the tables/columns from migrations 001–015. The old migration files include legacy inconsistencies (for example, 005's inline partial `UNIQUE` syntax); do not blindly rerun the entire old migration history. Check the live schema first. Migration 016 is transactional and can be rerun.
+3. Deploy the backend with its existing secret/service-role Supabase key. New RPCs are unavailable to anon/authenticated roles. Metrics will return an error if the migration has not been applied.
+4. The default hourly maintenance begins a minute after backend startup. For an initial backlog, call `select public.cleanup_expired_auth_records(1000);` in separate transactions until each batch no longer fills. For serverless/sleeping backends, schedule that call externally instead. The RPC serializes concurrent runs; it does not persistently remember scheduler runs across instances.
+5. Recheck database sizes and query-time deltas after normal traffic. Deleting rows generally makes space reusable inside PostgreSQL rather than immediately shrinking the physical database file; autovacuum can reclaim reusable space. Avoid `VACUUM FULL` on a busy production database without a maintenance plan.
+
+Audit history, old `otps` data, appointment events and unused indexes may still be large. Choose any archival/deletion policy based on the diagnostic results; none is automatically purged here. Reminder/digest scheduling remains per backend instance and still needs a single designated scheduler for multi-instance deployments.
+
+## Validation
+
+Run `node --test tests/*.test.js` from Backend for cache and middleware regression tests. The standalone database regression script uses PGlite (PostgreSQL) in a temporary directory; its test data exceeds 1,000 appointments to check exact counts, view revenue, cleanup boundaries, rerun safety and RPC access permissions. It requires `PGLITE_MODULE` to point to an installed PGlite module. It never reads `.env` or contacts Supabase.
+
+Sources: [Supabase database size](https://supabase.com/docs/guides/platform/database-size), [query optimization](https://supabase.com/docs/guides/database/query-optimization), [database inspection](https://supabase.com/docs/guides/observability/inspect).

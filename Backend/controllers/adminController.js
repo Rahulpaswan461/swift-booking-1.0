@@ -1,8 +1,15 @@
+import { emailLookup } from '../utils/emailLookup.js'
 import supabase from "../config/supabase.js"
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { buildClinicUrl } from "../utils/clinicUrl.js"
 import { EARLY_ACCESS } from "../middleware/tenant.js"
+import { createDashboardStats } from '../services/dashboardStats.js'
+
+const loadDashboardStats = createDashboardStats({
+    db: supabase,
+    onFallback: code => console.warn(`Dashboard statistics RPC unavailable (${code}); using scoped table reads. Apply migration 016 to enable database aggregation.`),
+})
 
 export const adminlogin = async (req, res) => {
     try {
@@ -18,7 +25,7 @@ export const adminlogin = async (req, res) => {
         const { data: admin, error } = await supabase
             .from('admins')
             .select('*')
-            .eq('email', email)
+            .ilike('email', emailLookup(email))
             .single()
 
         if (error || !admin) {
@@ -81,7 +88,7 @@ export const getAllAppointments = async (req, res) => {
         let query = supabase
             .from('appointments')
             .select(`
-                *,
+                id, appointment_date, appointment_time, status, notes, created_at,
                 patients (name, email, phone),
                 doctors  (full_name, specialization)
             `)
@@ -144,109 +151,13 @@ export const getAllAppointments = async (req, res) => {
 export const getStats = async (req, res) => {
     try {
         const clinicId = req.admin.clinic_id
-        const today = new Date().toISOString().split('T')[0]
-
-        // Get start of current week (Monday)
-        const now = new Date()
-        const dayOfWeek = now.getDay() || 7
-        const monday = new Date(now)
-        monday.setDate(now.getDate() - dayOfWeek + 1)
-        const weekStart = monday.toISOString().split('T')[0]
-
-        // Fetch all data in ONE parallel batch, selecting only needed
-        // columns — this endpoint drives the dashboard and must be fast.
-        const [
-            { data: todayAppointments },
-            { data: weekAppointments },
-            { count: totalAppointmentsCount },
-            { count: totalDoctorsCount },
-            { data: patientIds }
-        ] = await Promise.all([
-            // Today — includes the doctor join so the per-doctor breakdown
-            // needs no second query
-            supabase
-                .from('appointments')
-                .select('status, doctor_id, doctors (full_name, specialization)')
-                .eq('clinic_id', clinicId)
-                .eq('appointment_date', today),
-
-            // This week — status only
-            supabase
-                .from('appointments')
-                .select('status')
-                .eq('clinic_id', clinicId)
-                .gte('appointment_date', weekStart),
-
-            // All time count
-            supabase
-                .from('appointments')
-                .select('*', { count: 'exact', head: true })
-                .eq('clinic_id', clinicId),
-
-            // Active doctors count (this clinic only)
-            supabase
-                .from('doctors')
-                .select('*', { count: 'exact', head: true })
-                .eq('clinic_id', clinicId)
-                .eq('is_active', true),
-
-            // Unique patients (this clinic only)
-            supabase
-                .from('appointments')
-                .select('patient_id')
-                .eq('clinic_id', clinicId)
-        ])
-
-        const uniquePatients = new Set(patientIds?.map(r => r.patient_id) || [])
-
-        // Per-doctor breakdown from the already-fetched today rows
-        const doctorBreakdownMap = {}
-        todayAppointments?.forEach(appt => {
-            if (!doctorBreakdownMap[appt.doctor_id]) {
-                doctorBreakdownMap[appt.doctor_id] = {
-                    doctorName: appt.doctors?.full_name,
-                    specialization: appt.doctors?.specialization,
-                    total: 0,
-                    completed: 0,
-                    pending: 0,
-                    no_show: 0
-                }
-            }
-            doctorBreakdownMap[appt.doctor_id].total += 1
-            if (appt.status === 'completed') doctorBreakdownMap[appt.doctor_id].completed += 1
-            if (appt.status === 'confirmed') doctorBreakdownMap[appt.doctor_id].pending += 1
-            if (appt.status === 'no_show') doctorBreakdownMap[appt.doctor_id].no_show += 1
-        })
-
-        const doctorBreakdown = Object.values(doctorBreakdownMap)
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                today: {
-                    total: todayAppointments?.length || 0,
-                    confirmed: todayAppointments?.filter(a => a.status === 'confirmed').length || 0,
-                    completed: todayAppointments?.filter(a => a.status === 'completed').length || 0,
-                    cancelled: todayAppointments?.filter(a => a.status === 'cancelled').length || 0,
-                    no_show: todayAppointments?.filter(a => a.status === 'no_show').length || 0,
-                },
-                this_week: {
-                    total: weekAppointments?.length || 0,
-                    completed: weekAppointments?.filter(a => a.status === 'completed').length || 0,
-                    cancelled: weekAppointments?.filter(a => a.status === 'cancelled').length || 0,
-                },
-                all_time: {
-                    total_appointments: totalAppointmentsCount || 0,
-                    total_doctors: totalDoctorsCount || 0,
-                    total_patients: uniquePatients.size,
-                },
-                doctor_breakdown: doctorBreakdown,
-            }
-        })
+        const data = await loadDashboardStats(clinicId, process.env.DASHBOARD_TZ || process.env.REMINDER_TZ || 'Asia/Kolkata')
+        res.set('Cache-Control', 'no-store')
+        return res.status(200).json({ success: true, data })
 
     } catch (err) {
         console.error('getStats error:', err)
-        return res.status(500).json({ success: false, message: 'Server error.' })
+        return res.status(503).json({ success: false, message: 'Clinic totals are temporarily unavailable. Please retry shortly.' })
     }
 }
 

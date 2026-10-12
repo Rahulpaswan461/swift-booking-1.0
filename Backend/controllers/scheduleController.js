@@ -1,5 +1,5 @@
 import supabase from "../config/supabase.js"
-import { generateSlots, getDayAbb, isSlotBlocked } from "../utils/slotUtils.js"
+import { availableAppointments, clockTime, validDate } from "../services/appointmentAvailability.js"
 
 // Admin sets or updates a doctor's default weekly schedule
 export const setDoctorSchedule = async (req, res) => {
@@ -8,8 +8,8 @@ export const setDoctorSchedule = async (req, res) => {
         const { id: doctor_id } = req.params;
         const { workingDays, startTime, endTime, slotDurationMin } = req.body;
 
-        if (!workingDays || !startTime || !endTime || !slotDurationMin) {
-            return res.status(400).json({ message: "Please provide all the fields" })
+        if (!Array.isArray(workingDays) || !workingDays.length || workingDays.some(day => !['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].includes(day)) || !clockTime(startTime) || !clockTime(endTime) || clockTime(startTime) >= clockTime(endTime) || !Number.isInteger(Number(slotDurationMin)) || Number(slotDurationMin) < 1 || Number(slotDurationMin) > 1440) {
+            return res.status(400).json({ message: "Choose valid working days, start/end times and a positive whole-number slot duration." })
         }
 
         // Check if doctor exists and belongs to this admin's clinic
@@ -36,7 +36,7 @@ export const setDoctorSchedule = async (req, res) => {
                     working_days: workingDays,
                     start_time: startTime,
                     end_time: endTime,
-                    slot_duration_min: slotDurationMin,
+                    slot_duration_min: Number(slotDurationMin),
                     updated_at: new Date().toISOString()
                 },
                 { onConflict: 'doctor_id' }
@@ -62,8 +62,8 @@ export const addUnavailability = async (req, res) => {
         const { id: doctorId } = req.params;
         const { date, startTime, endTime, reason } = req.body;
 
-        if (!date) {
-            return res.status(400).json({ success: false, message: "Date is required" })
+        if (!validDate(date) || ((startTime || endTime) && (!clockTime(startTime) || !clockTime(endTime) || clockTime(startTime) >= clockTime(endTime)))) {
+            return res.status(400).json({ success: false, message: "Choose a valid date and time range." })
         }
 
         // Check if doctor exists and belongs to this admin's clinic
@@ -104,88 +104,12 @@ export const addUnavailability = async (req, res) => {
     }
 }
 
-// Return available slots for a doctor on a given date
+// Use the same availability rules for display, booking and rescheduling.
 export const getDoctorSlots = async (req, res) => {
-    try {
-        const { id: doctorId } = req.params;
-        const { date } = req.query
-        const clinicId = req.tenant?.id
-
-        if (!date) {
-            return res.status(400).json({ success: false, message: "date query params is required" })
-        }
-
-        if (!clinicId) {
-            return res.status(400).json({ success: false, message: "Clinic context is required. Access through your clinic subdomain." })
-        }
-
-        // 0. Doctor must belong to the resolved clinic (tenant isolation)
-        const { data: slotDoctor } = await supabase
-            .from('doctors')
-            .select('id, clinic_id')
-            .eq('id', doctorId)
-            .single()
-
-        if (!slotDoctor || slotDoctor.clinic_id !== clinicId) {
-            return res.status(404).json({ success: false, message: 'Doctor not found at this clinic.' })
-        }
-
-        // 1. Get doctor's default schedule
-        const { data: schedule, error: scheduleError } = await supabase
-            .from('doctor_schedules')
-            .select('*')
-            .eq('doctor_id', doctorId)
-            .single()
-
-        if (scheduleError || !schedule) {
-            return res.status(400).json({ success: false, message: 'No schedule set for this doctor.' })
-        }
-
-        // 2. Check if requested date is working day
-        const dayAbbr = getDayAbb(date)
-        if (!schedule.working_days.includes(dayAbbr)) {
-            return res.status(200).json({ success: true, availableSlots: [], message: "Doctor is off on this day." })
-        }
-
-        const allSlots = generateSlots(schedule.start_time, schedule.end_time, schedule.slot_duration_min);
-
-        // 4. Get unavailabilities for this date
-        const { data: unavailabilities } = await supabase
-            .from('doctor_unavailability')
-            .select('*')
-            .eq('doctor_id', doctorId)
-            .eq('date', date)
-
-        // 5. Get already booked slots for this date
-        const { data: bookedAppointments, error: appointmentsError } = await supabase
-            .from('appointments')
-            .select('appointment_time')
-            .eq('doctor_id', doctorId)
-            .eq('appointment_date', date)
-            .in('status', ['confirmed', 'pending'])
-
-        if (appointmentsError) throw appointmentsError
-
-        const bookedTimes = bookedAppointments?.map(a => a.appointment_time) || []
-
-        // 6. Filter out blocked and booked slots
-        const availableSlots = allSlots.filter(slot => {
-            const isBooked = bookedTimes.includes(slot);
-            const isBlocked = isSlotBlocked(slot, date, schedule.slot_duration_min, unavailabilities)
-
-            return !isBooked && !isBlocked;
-        })
-
-        return res.status(200).json({
-            success: true,
-            date,
-            doctorId,
-            availableSlots: availableSlots
-        })
-
-    }
-    catch (err) {
-        console.error('getDoctorSlots error:', err);
-        return res.status(500).json({ success: false, message: 'Server error.' });
-    }
+  try {
+    const availableSlots = await availableAppointments({db:supabase,clinicId:req.tenant?.id,doctorId:req.params.id,date:req.query.date,timezone:req.tenant?.timezone})
+    return res.status(200).json({success:true,date:req.query.date,doctorId:req.params.id,availableSlots})
+  } catch(error) {
+    return res.status(error.status || 500).json({success:false,message:error.status ? error.message : 'Unable to load appointment times.'})
+  }
 }

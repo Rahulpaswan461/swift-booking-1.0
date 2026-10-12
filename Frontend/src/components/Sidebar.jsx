@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import Logo from './Logo'
 import SupportModal from './SupportModal'
@@ -17,6 +17,8 @@ import SupportModal from './SupportModal'
 function SidebarShell({ children }) {
   const [open, setOpen] = useState(false)
   const location = useLocation()
+  const drawer = useRef(null)
+  const opener = useRef(null)
 
   // Navigating away should always dismiss the drawer.
   useEffect(() => { setOpen(false) }, [location.pathname])
@@ -31,9 +33,19 @@ function SidebarShell({ children }) {
 
   useEffect(() => {
     if (!open) return
-    const onKeyDown = (e) => { if (e.key === 'Escape') setOpen(false) }
+    const previousFocus = document.activeElement
+    const focusable = () => [...drawer.current.querySelectorAll('a[href],button:not([disabled])')].filter(el => el.getClientRects().length)
+    focusable()[0]?.focus()
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Tab') {
+        const items = focusable(), first = items[0], last = items[items.length - 1]
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus() }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus() }
+      }
+    }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    return () => { window.removeEventListener('keydown', onKeyDown); previousFocus?.focus() }
   }, [open])
 
   return (
@@ -45,6 +57,8 @@ function SidebarShell({ children }) {
           onClick={() => setOpen(true)}
           aria-label="Open navigation menu"
           aria-expanded={open}
+          aria-controls="staff-navigation"
+          ref={opener}
           className="-ml-1 rounded-lg p-2 text-gray-600 transition hover:bg-surface-100 hover:text-gray-900"
         >
           <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
@@ -63,8 +77,8 @@ function SidebarShell({ children }) {
         }`}
       />
 
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col overflow-y-auto border-r border-surface-100 bg-white shadow-sm transition-transform duration-300 ease-out md:static md:z-auto md:min-h-screen md:transform-none md:border-white md:transition-none ${
+      <aside id="staff-navigation" ref={drawer}
+        className={`staff-sidebar ${open ? 'open' : 'closed'} fixed inset-y-0 left-0 z-50 flex w-64 flex-col overflow-y-auto border-r border-surface-100 bg-white shadow-sm transition-transform duration-300 ease-out md:static md:z-auto md:min-h-screen md:transform-none md:border-white md:transition-none ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

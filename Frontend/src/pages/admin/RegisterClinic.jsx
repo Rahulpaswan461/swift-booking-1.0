@@ -43,7 +43,7 @@ export default function RegisterClinic() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface-50">
+    <div className="staff-auth flex min-h-screen flex-col">
       <header className="flex items-center justify-between border-b border-white/70 bg-white/80 px-6 py-5 backdrop-blur-xl sm:px-8">
         <Logo />
         <span className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-brand-700">Get Started</span>
@@ -75,8 +75,8 @@ export default function RegisterClinic() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Clinic Name</label>
-                <input type="text" value={form.name}
+                <label htmlFor="registerclinic-field-1" className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Clinic Name</label>
+                <input id="registerclinic-field-1" type="text" value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value, slug: slugEdited ? form.slug : slugify(e.target.value) })}
                   placeholder="Apollo Physiotherapy" required
                   className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm transition hover:border-brand-200 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100" />
@@ -84,27 +84,27 @@ export default function RegisterClinic() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Subdomain Slug <span className="font-normal text-gray-400">(auto-generated, editable)</span></label>
-                <input type="text" value={form.slug}
+                <label htmlFor="registerclinic-field-2" className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Subdomain Slug <span className="font-normal text-gray-400">(auto-generated, editable)</span></label>
+                <input id="registerclinic-field-2" type="text" value={form.slug}
                   onChange={e => { setSlugEdited(true); setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }) }}
                   placeholder="apollo-clinic" required
                   className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm transition hover:border-brand-200 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Your Email</label>
-                <input type="email" value={form.ownerEmail} onChange={e => setForm({ ...form, ownerEmail: e.target.value })}
+                <label htmlFor="registerclinic-field-3" className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Your Email</label>
+                <input id="registerclinic-field-3" type="email" value={form.ownerEmail} onChange={e => setForm({ ...form, ownerEmail: e.target.value })}
                   placeholder="you@clinic.com" required
                   className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm transition hover:border-brand-200 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Password</label>
+                <label htmlFor="registerclinic-field-4" className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Password</label>
                 <div className="relative">
-                  <input type={show ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+                  <input id="registerclinic-field-4" type={show ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                     placeholder="Min 8 characters" required minLength={8}
                     className="w-full rounded-2xl border border-gray-200 px-4 py-3 pr-11 text-sm transition hover:border-brand-200 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100" />
-                  <button type="button" onClick={() => setShow(!show)}
+                  <button type="button" aria-label={show ? 'Hide password' : 'Show password'} onClick={() => setShow(!show)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition">
                     <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
                       <path d="M2 8s2.5-5 6-5 6 5 6 5-2.5 5-6 5-6-5-6-5z" stroke="currentColor" strokeWidth="1.5" />
@@ -115,15 +115,15 @@ export default function RegisterClinic() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Specialization</label>
-                <input type="text" value={form.specialization} onChange={e => setForm({ ...form, specialization: e.target.value })}
+                <label htmlFor="registerclinic-field-5" className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Specialization</label>
+                <input id="registerclinic-field-5" type="text" value={form.specialization} onChange={e => setForm({ ...form, specialization: e.target.value })}
                   placeholder="Physiotherapy" required
                   className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm transition hover:border-brand-200 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Address <span className="font-normal text-gray-400">(optional)</span></label>
-                <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })}
+                <label htmlFor="registerclinic-field-6" className="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Address <span className="font-normal text-gray-400">(optional)</span></label>
+                <input id="registerclinic-field-6" type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })}
                   placeholder="123 Main St, City"
                   className="w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm transition hover:border-brand-200 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100" />
               </div>

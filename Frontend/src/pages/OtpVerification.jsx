@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../api/axios'
 import Logo from '../components/Logo'
 import StepIndicator from '../components/StepIndicator'
@@ -16,6 +16,7 @@ export default function OtpVerification() {
   const [countdown, setCountdown] = useState(OTP_TTL)
   const refs = useRef([])
   const navigate = useNavigate()
+  const { state } = useLocation()
   const { savePatient } = useAuth()
 
   const contactValue = localStorage.getItem('otp_contact')
@@ -68,7 +69,6 @@ export default function OtpVerification() {
         contact_type: contactType,
         otp_code: code,
       })
-      console.log('res ', res)
       // Save patient token AND patient_id using the new context method
       savePatient(res.data.token, res.data.patient_id, contactValue, contactType, res.data.clinic_id)
 
@@ -83,7 +83,8 @@ export default function OtpVerification() {
         console.warn('Failed to fetch clinic info:', clinicErr)
       }
 
-      navigate('/doctors')
+      const selectedDoctor = state?.doctor
+      navigate(selectedDoctor?.id ? `/book/${selectedDoctor.id}` : '/doctors', { state: selectedDoctor ? { doctor: selectedDoctor } : null })
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid OTP. Please try again.')
       setOtp(['', '', '', '', '', ''])

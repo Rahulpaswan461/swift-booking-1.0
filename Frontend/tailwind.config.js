@@ -3,8 +3,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ["'Playfair Display'", "serif"],
-        body: ["'DM Sans'", "sans-serif"],
+        display: ["var(--font-display)"],
+        body: ["var(--font-body)"],
       },
       colors: {
         // Driven by CSS variables (see index.css) so each clinic's

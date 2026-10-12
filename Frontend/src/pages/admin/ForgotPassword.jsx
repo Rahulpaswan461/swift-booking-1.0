@@ -1,5 +1,5 @@
 import PasswordResetFlow from '../../components/PasswordResetFlow'
 
 export default function AdminForgotPassword() {
-  return <PasswordResetFlow role="admin" />
+  return <div className="staff-auth"><PasswordResetFlow role="admin" /></div>
 }

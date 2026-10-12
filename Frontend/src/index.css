@@ -7,6 +7,8 @@
      re-theme the whole patient portal at runtime (see utils/theme.js).
      Defaults = the Healibrate teal. */
   :root {
+    --font-body: 'DM Sans', sans-serif;
+    --font-display: 'Playfair Display', serif;
     --brand-50: 238 250 247;
     --brand-100: 215 242 236;
     --brand-200: 175 227 216;
@@ -21,7 +23,7 @@
 
   * { box-sizing: border-box; }
   body {
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-body);
     background: #f8fbfa;
     color: #111827;
     -webkit-font-smoothing: antialiased;

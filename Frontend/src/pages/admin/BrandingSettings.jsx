@@ -1,7 +1,10 @@
+import { StaffHeader } from '../../components/StaffUI'
 import { useState, useEffect } from 'react'
 import { AdminSidebar } from '../../components/Sidebar'
 import { adminApi } from '../../api/axios'
-import { paletteToCss } from '../../utils/theme'
+import ClinicHero from '../../components/ClinicHero'
+import ClinicVisitGuide from '../../components/ClinicVisitGuide'
+import { generatePalette } from '../../utils/theme'
 import { clinicUrl } from '../../utils/clinicUrl'
 
 const PRESET_COLORS = [
@@ -27,89 +30,19 @@ function formatTime(t) {
  * Live preview of the patient booking page header,
  * rendered with the branding currently in the form.
  */
-function BookingPagePreview({ form, clinicName }) {
-  const c = paletteToCss(form.primary_color)
+function BookingPagePreview({ form, clinicName, clinic, hours }) {
   const name = form.clinic_name || clinicName || 'Your Clinic'
-
-  return (
-    <div className="rounded-2xl border border-gray-200 overflow-hidden shadow-sm bg-white">
-      <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-1.5">
-        <span className="w-2.5 h-2.5 rounded-full bg-gray-200" />
-        <span className="w-2.5 h-2.5 rounded-full bg-gray-200" />
-        <span className="w-2.5 h-2.5 rounded-full bg-gray-200" />
-        <span className="ml-2 text-[11px] text-gray-400 truncate">Patient booking page</span>
-      </div>
-
-      {/* Header bar */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-white">
-        <div className="flex items-center gap-2.5 min-w-0">
-          {form.logo_url ? (
-            <img
-              src={form.logo_url}
-              alt=""
-              className="w-8 h-8 rounded-full object-cover border"
-              style={{ borderColor: c[100] }}
-              onError={(e) => { e.target.style.display = 'none' }}
-            />
-          ) : (
-            <span
-              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: c[600] }}
-            >
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2v12M2 8h12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
-            </span>
-          )}
-          <span className="font-display font-semibold text-gray-900 truncate">{name}</span>
-        </div>
-        <span
-          className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-white flex-shrink-0"
-          style={{ backgroundColor: c[600] }}
-        >
-          Book Appointment
-        </span>
-      </div>
-
-      {/* Hero snippet */}
-      <div className="px-5 py-6" style={{ background: `linear-gradient(180deg, ${c[50]}, #ffffff)` }}>
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-[11px] font-semibold"
-          style={{ borderColor: c[100], color: c[800] }}
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-          Accepting appointments now
-        </span>
-        <p className="mt-3 font-display text-xl font-semibold leading-snug text-gray-900">
-          Book your appointment at <span style={{ color: c[600] }}>{name}</span>
-        </p>
-        <p className="mt-1.5 text-xs text-gray-500 leading-relaxed">
-          {form.tagline || 'Choose from our experienced doctors and get confirmed instantly.'}
-        </p>
-        {form.badges?.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {form.badges.map((badge) => (
-              <span key={badge}
-                className="inline-flex items-center gap-1 rounded-full bg-white border px-2 py-0.5 text-[10px] font-semibold"
-                style={{ borderColor: c[100], color: c[700] }}>
-                <svg width="9" height="9" viewBox="0 0 14 14" fill="none">
-                  <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M4 7l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                {badge}
-              </span>
-            ))}
-          </div>
-        )}
-        <span
-          className="mt-4 inline-block rounded-xl px-4 py-2 text-xs font-bold text-white"
-          style={{ backgroundColor: c[600] }}
-        >
-          Book Appointment
-        </span>
-      </div>
+  const hex = /^#[0-9a-f]{6}$/i.test(form.primary_color) ? form.primary_color : '#1d7f72'
+  const theme = Object.fromEntries(Object.entries(generatePalette(hex)).map(([shade, rgb]) => [`--brand-${shade}`, rgb.join(' ')]))
+  return <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white" style={theme}>
+    <div className="border-b border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-500">Patient booking page · Live preview</div>
+    <div className="border-b border-gray-100 px-5 py-4 font-display font-semibold text-gray-900">{name}</div>
+    {/* Keep positioned preview content inside its own scroll area. */}
+    <div className="relative max-h-[720px] overflow-y-auto">
+    <ClinicHero preview clinicName={name} logoUrl={form.logo_url} tagline={form.tagline} badges={form.badges || []} />
+    <ClinicVisitGuide preview clinic={{ ...clinic, operating_hours: hours }} clinicName={name} />
     </div>
-  )
+  </div>
 }
 
 export default function BrandingSettings() {
@@ -204,9 +137,9 @@ export default function BrandingSettings() {
   }
 
   if (loading) return (
-    <div className="flex min-h-screen bg-surface-50">
+    <div className="staff-workspace flex min-h-screen">
       <AdminSidebar />
-      <main className="flex-1 flex items-center justify-center text-gray-400 text-sm gap-2 pt-14 md:pt-0">
+      <main className="staff-content flex-1 flex items-center justify-center text-gray-400 text-sm gap-2 pt-14 md:pt-0">
         <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
           <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
           <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -217,14 +150,11 @@ export default function BrandingSettings() {
   )
 
   return (
-    <div className="flex min-h-screen bg-surface-50">
+    <div className="staff-workspace flex min-h-screen">
       <AdminSidebar />
 
-      <main className="flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
-        <div className="mb-8">
-          <h1 className="font-display text-3xl font-semibold text-ink-900">Clinic Settings</h1>
-          <p className="text-gray-500 text-sm mt-1">Branding, booking link, and operating hours</p>
-        </div>
+      <main className="staff-content flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
+        <StaffHeader title="Clinic Settings" description="Branding, booking link, and operating hours" />
 
         {(success || error) && (
           <div className={`mb-6 max-w-5xl flex items-center gap-2 rounded-xl border px-4 py-3 text-sm
@@ -283,8 +213,8 @@ export default function BrandingSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Clinic display name</label>
-                <input
+                <label htmlFor="brandingsettings-field-1" className="block text-sm font-semibold text-gray-700 mb-2">Clinic display name</label>
+                <input id="brandingsettings-field-1"
                   type="text"
                   value={form.clinic_name}
                   onChange={e => setForm({ ...form, clinic_name: e.target.value })}
@@ -294,8 +224,8 @@ export default function BrandingSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Tagline</label>
-                <input
+                <label htmlFor="brandingsettings-field-2" className="block text-sm font-semibold text-gray-700 mb-2">Tagline</label>
+                <input id="brandingsettings-field-2"
                   type="text"
                   value={form.tagline}
                   onChange={e => setForm({ ...form, tagline: e.target.value })}
@@ -306,8 +236,8 @@ export default function BrandingSettings() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Logo URL</label>
-                <input
+                <label htmlFor="brandingsettings-field-3" className="block text-sm font-semibold text-gray-700 mb-2">Logo URL</label>
+                <input id="brandingsettings-field-3"
                   type="url"
                   value={form.logo_url}
                   onChange={e => setForm({ ...form, logo_url: e.target.value })}
@@ -363,7 +293,7 @@ export default function BrandingSettings() {
                           }
                         }
                       }}
-                      placeholder="NABH Accredited"
+                      aria-label="Credential or accreditation badge" placeholder="NABH Accredited"
                       className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm transition focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100"
                     />
                     <button
@@ -403,7 +333,7 @@ export default function BrandingSettings() {
                 </div>
                 <div className="flex items-center gap-3">
                   <input
-                    type="color"
+                    aria-label="Custom primary color" type="color"
                     value={form.primary_color || '#1d7f72'}
                     onChange={e => setForm({ ...form, primary_color: e.target.value })}
                     className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer"
@@ -459,8 +389,8 @@ export default function BrandingSettings() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Opens at</label>
-                  <input
+                  <label htmlFor="brandingsettings-field-4" className="block text-sm font-semibold text-gray-700 mb-2">Opens at</label>
+                  <input id="brandingsettings-field-4"
                     type="time"
                     value={hours.open}
                     onChange={e => setHours({ ...hours, open: e.target.value })}
@@ -468,8 +398,8 @@ export default function BrandingSettings() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Closes at</label>
-                  <input
+                  <label htmlFor="brandingsettings-field-5" className="block text-sm font-semibold text-gray-700 mb-2">Closes at</label>
+                  <input id="brandingsettings-field-5"
                     type="time"
                     value={hours.close}
                     onChange={e => setHours({ ...hours, close: e.target.value })}
@@ -499,7 +429,7 @@ export default function BrandingSettings() {
           {/* ── Right: live preview ──────────────────────────── */}
           <div className="lg:sticky lg:top-8">
             <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">Live preview</p>
-            <BookingPagePreview form={form} clinicName={clinic?.name} />
+            <BookingPagePreview form={form} clinicName={clinic?.name} clinic={clinic} hours={hours} />
             <p className="mt-3 text-xs text-gray-400 leading-relaxed">
               This is how your booking page header will look to patients. Save to publish the changes.
             </p>

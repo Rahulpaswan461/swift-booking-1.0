@@ -1,3 +1,4 @@
+import { subscriptionPeriod } from "../services/subscriptionPeriod.js";
 import supabase from "../config/supabase.js";
 
 // Reserved subdomains that should NOT be treated as clinic slugs
@@ -161,29 +162,35 @@ export function invalidateSubscriptionCache(clinicId) {
   else SUBSCRIPTION_CACHE.clear();
 }
 
-async function loadClinicSubscription(clinicId) {
+export async function loadClinicSubscription(clinicId) {
   const cached = SUBSCRIPTION_CACHE.get(clinicId);
   if (cached && Date.now() - cached.at < SUBSCRIPTION_CACHE_TTL_MS) {
     return cached;
   }
 
-  const [{ data: clinic, error }, { data: subscription }] = await Promise.all([
+  const [{ data: clinic, error }, { data: subscriptions, error: subscriptionError }] = await Promise.all([
     supabase
       .from("clinics")
       .select("id, name, subscription_plan, is_active")
       .eq("id", clinicId)
-      .single(),
+      .maybeSingle(),
     supabase
       .from("subscriptions")
-      .select("plan, status, ends_at")
+      .select("plan, status, ends_at, next_billing_date")
       .eq("clinic_id", clinicId)
       .eq("status", "active")
       .order("updated_at", { ascending: false })
-      .limit(1)
-      .then((r) => ({ data: r.data?.[0] || null }), () => ({ data: null })),
+      .limit(1),
   ]);
 
-  const entry = { clinic: error ? null : clinic, subscription: subscription || null, at: Date.now() };
+  // A failed lookup is not evidence that access was revoked. Never cache an
+  // outage as a missing account, or live clients would stop reconnecting.
+  if (error || subscriptionError) {
+    const unavailable = new Error("Unable to verify clinic access. Please try again.");
+    unavailable.code = "unavailable";
+    throw unavailable;
+  }
+  const entry = { clinic, subscription: subscriptions?.[0] || null, at: Date.now() };
   SUBSCRIPTION_CACHE.set(clinicId, entry);
   return entry;
 }
@@ -247,13 +254,16 @@ export const enforceSubscription = async (req, res, next) => {
     }
 
     // Active subscription that has passed its end date → expired.
-    if (subscription.ends_at && new Date(subscription.ends_at) < new Date()) {
+    if (!subscriptionPeriod(subscription).active) {
       return res.status(403).json({
         success: false,
         message: isStaff
-          ? "Your subscription has expired. Renew to continue."
+          ? subscriptionPeriod(subscription).status === "expired"
+            ? "Your subscription has expired. Renew to continue."
+            : "Your subscription period could not be verified. Review your billing or contact support."
           : patientBlockedMessage,
-        subscription_expired: true,
+        subscription_expired: subscriptionPeriod(subscription).status === "expired",
+        subscription_required: true,
       });
     }
 
@@ -265,7 +275,7 @@ export const enforceSubscription = async (req, res, next) => {
     next();
   } catch (err) {
     console.error("Subscription enforcement error:", err);
-    return res.status(500).json({
+    return res.status(err.code === "unavailable" ? 503 : 500).json({
       success: false,
       message: "Failed to verify subscription",
     });
@@ -308,11 +318,13 @@ export const enforcePlanLimits = (resource) => async (req, res, next) => {
     const { maxDoctors } = config;
 
     if (resource === "doctors" && maxDoctors !== Infinity) {
-      const { count: doctorCount } = await supabase
+      const { count: doctorCount, error: countError } = await supabase
         .from("doctors")
         .select("*", { count: "exact", head: true })
         .eq("clinic_id", clinicId)
         .eq("is_active", true);
+
+      if (countError) return res.status(503).json({success:false,message:'Unable to verify your plan limits. Please try again.'});
 
       if (doctorCount >= maxDoctors) {
         return res.status(403).json({

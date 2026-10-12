@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { StaffHeader } from '../../components/StaffUI'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { adminApi } from '../../api/axios'
 import { AdminSidebar } from '../../components/Sidebar'
@@ -67,10 +68,14 @@ const STATUS_STYLES = {
 export default function BillingPage() {
   const [clinic, setClinic] = useState(null)
   const [payments, setPayments] = useState([])
+  const [historyError, setHistoryError] = useState('')
   const [historyLoading, setHistoryLoading] = useState(true)
   const [loading, setLoading] = useState(true)
   const [redirecting, setRedirecting] = useState('')
   const [error, setError] = useState('')
+  const [checkoutReference, setCheckoutReference] = useState('')
+  const errorRef = useRef(null)
+  useEffect(() => { if (error) errorRef.current?.focus() }, [error])
   const [searchParams] = useSearchParams()
 
   // We're back from the hosted checkout. `from=checkout` is our own marker;
@@ -98,11 +103,13 @@ export default function BillingPage() {
   // Payment ledger — the persistent record of every charge. Kept separate from
   // the clinic fetch so a history failure never blocks the plan UI.
   const loadHistory = async () => {
+    setHistoryLoading(true)
+    setHistoryError('')
     try {
       const res = await adminApi.get('/admin/billing/history')
       setPayments(res.data.data || [])
     } catch {
-      setPayments([])
+      setHistoryError('Payment history could not be loaded. Please try again.')
     } finally {
       setHistoryLoading(false)
     }
@@ -115,6 +122,7 @@ export default function BillingPage() {
         const res = await adminApi.get('/admin/clinic/me')
         return res.data.data
       } catch {
+        if (!cancelled) setError('Your current plan could not be verified. Please refresh or contact support.')
         return null
       }
     }
@@ -177,7 +185,9 @@ export default function BillingPage() {
   const currentPlan = subscriptionActive ? clinic?.subscription_plan : null
 
   const startCheckout = async (planId) => {
+    if (redirecting) return
     setError('')
+    setCheckoutReference('')
     setRedirecting(planId)
     try {
       // Send our current origin so the backend returns us to the SAME origin
@@ -186,23 +196,22 @@ export default function BillingPage() {
       const res = await adminApi.post('/admin/billing/checkout', {
         plan: planId,
         returnOrigin: window.location.origin,
-      })
+      }, { timeout: 25_000 })
+      if (!res.data.url) throw new Error('Missing checkout URL')
       window.location.href = res.data.url
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not start the checkout. Please try again.')
+      setError(err.response?.data?.message || 'The checkout connection was interrupted. Please try again shortly.')
+      setCheckoutReference(err.response?.data?.reference || '')
       setRedirecting('')
     }
   }
 
   return (
-    <div className="flex min-h-screen bg-surface-50">
+    <div className="staff-workspace flex min-h-screen">
       <AdminSidebar />
 
-      <main className="flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
-        <div className="mb-8">
-          <h1 className="font-display text-3xl font-semibold text-ink-900">Plan & Billing</h1>
-          <p className="mt-1 text-sm text-gray-500">Your subscription, and what each plan unlocks</p>
-        </div>
+      <main className="staff-content flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
+        <StaffHeader title="Plan & Billing" description="Your subscription, and what each plan unlocks" />
 
         {postPay === 'processing' && (
           <div className="mb-6 flex max-w-4xl items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 px-5 py-4">
@@ -218,7 +227,7 @@ export default function BillingPage() {
             <p className="text-sm font-semibold text-green-800">
               Payment received — your {clinic?.entitlements?.plan_label} plan is active.
             </p>
-            <p className="mt-0.5 text-sm text-green-700">Your clinic is live. All plan features are unlocked.</p>
+            <p className="mt-0.5 text-sm text-green-700">Your clinic is live. The features included in your plan are available.</p>
           </div>
         )}
         {postPay === 'failed' && (
@@ -245,13 +254,14 @@ export default function BillingPage() {
         )}
 
         {error && (
-          <div className="mb-6 max-w-4xl rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-sm text-red-600">
-            {error}
+          <div role="alert" tabIndex={-1} ref={errorRef} className="mb-6 max-w-4xl rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">
+            <p>{error}</p>
+            {checkoutReference && <p className="mt-2 break-all text-xs text-red-700">Support reference: {checkoutReference}</p>}
           </div>
         )}
 
         {/* Current plan */}
-        {!loading && (
+        {!loading && clinic && (
           earlyAccess ? (
             <div className="mb-8 max-w-4xl rounded-2xl border border-surface-100 bg-white p-6">
               <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Current plan</p>
@@ -275,15 +285,16 @@ export default function BillingPage() {
                   Active
                 </span>
               </div>
+              {clinic?.subscription_ends_at && <p className="mt-3 text-sm text-gray-600">Current paid period ends {formatPaidAt(clinic.subscription_ends_at)}. Access continues when your renewal is confirmed.</p>}
             </div>
           ) : (
             <div className="mb-8 max-w-4xl rounded-2xl border border-amber-200 bg-amber-50 p-6">
-              <p className="text-xs font-bold uppercase tracking-wider text-amber-600">No active plan</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-600">{clinic?.subscription_status === 'expired' ? `Expired on ${formatPaidAt(clinic.subscription_ends_at)}` : clinic?.subscription_status === 'unverified' ? 'Period needs verification' : 'No active plan'}</p>
               <p className="mt-2 font-display text-xl font-semibold text-ink-900">
-                Choose a plan to activate your clinic
+                {clinic?.subscription_status === 'expired' ? 'Your paid period has ended' : clinic?.subscription_status === 'unverified' ? 'We could not verify your subscription dates' : 'Choose a plan to activate your clinic'}
               </p>
               <p className="mt-1 text-sm text-amber-700">
-                Your booking page and dashboard stay locked until you subscribe. Pick a plan below to go live.
+                {clinic?.subscription_status === 'unverified' ? 'Contact support to verify your existing payment before subscribing again. Paid access resumes once your current period is confirmed.' : 'Your booking page and dashboard stay locked until your current paid period is confirmed. Choose a plan below to activate your clinic.'}
               </p>
             </div>
           )
@@ -341,7 +352,7 @@ export default function BillingPage() {
           <p className="mt-1 text-sm text-gray-500">Every charge on your clinic’s account</p>
 
           <div className="mt-4 overflow-hidden rounded-2xl border border-surface-100 bg-white">
-            {historyLoading ? (
+            {historyError ? <div role="alert" className="p-5 text-sm text-red-700">{historyError}<button onClick={loadHistory} className="ml-3 underline">Retry history</button></div> : historyLoading ? (
               <p className="px-5 py-6 text-sm text-gray-400">Loading payments…</p>
             ) : payments.length === 0 ? (
               <p className="px-5 py-6 text-sm text-gray-400">

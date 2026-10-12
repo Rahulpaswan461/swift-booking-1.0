@@ -1,3 +1,4 @@
+import { StaffHeader } from '../../components/StaffUI'
 import { useState, useEffect } from 'react'
 import { adminApi } from '../../api/axios'
 import { AdminSidebar } from '../../components/Sidebar'
@@ -14,6 +15,7 @@ export default function AdminDoctors() {
   const [feeSaving, setFeeSaving] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
   const [success, setSuccess] = useState('')
 
   // Shown ONCE after creating a doctor — { fullName, email, tempPassword, loginUrl }
@@ -27,9 +29,10 @@ export default function AdminDoctors() {
 
   const fetchDoctors = () => {
     setLoading(true)
+    setLoadError('')
     adminApi.get('/admin/doctors')
       .then(res => setDoctors(res.data.data || res.data))
-      .catch(console.error)
+      .catch(() => setLoadError('Your care team could not be loaded. Please try again.'))
       .finally(() => setLoading(false))
   }
 
@@ -77,7 +80,8 @@ export default function AdminDoctors() {
       fetchDoctors()
       setTimeout(() => setSuccess(''), 4000)
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update fee.')
+      setLoadError(err.response?.data?.message || 'Failed to update fee.')
+      setError(err.response?.data?.message || 'Failed to update fee.')
     } finally {
       setFeeSaving(false)
     }
@@ -88,7 +92,7 @@ export default function AdminDoctors() {
       await adminApi.patch(`/admin/doctors/${doctorId}/toggle`)
       fetchDoctors()
     } catch (err) {
-      alert('Failed to update doctor status.')
+      setLoadError('Failed to update doctor status. Please try again.')
     }
   }
 
@@ -126,15 +130,11 @@ export default function AdminDoctors() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="staff-workspace flex min-h-screen">
       <AdminSidebar />
 
-      <main className="flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-display font-semibold text-gray-900">Doctors</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Manage doctor accounts</p>
-          </div>
+      <main className="staff-content flex-1 overflow-auto p-4 pt-20 sm:p-6 sm:pt-20 md:p-8">
+        <StaffHeader title="Doctors" description="Manage your care team, schedules, and consultation fees.">
           <button onClick={() => setShowModal(true)}
             className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -142,8 +142,9 @@ export default function AdminDoctors() {
             </svg>
             Add doctor
           </button>
-        </div>
+        </StaffHeader>
 
+        {loadError && <div role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-red-800">{loadError}<button onClick={fetchDoctors} className="ml-3 underline">Retry</button></div>}
         {success && (
           <div className="flex items-center gap-2 text-green-700 text-sm bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -167,7 +168,7 @@ export default function AdminDoctors() {
           </div>
         ) : doctors.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
-            <div className="text-4xl mb-3">👨‍⚕️</div>
+            <div className="text-4xl mb-3">✚</div>
             <p className="font-medium">No doctors yet</p>
             <p className="text-xs mt-1">Click "Add doctor" to create the first one</p>
           </div>
@@ -175,11 +176,11 @@ export default function AdminDoctors() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {doctors.map((doctor, i) => (
               <div key={doctor.id || doctor._id}
-                className="bg-white border border-gray-100 rounded-2xl p-5 animate-fade-up opacity-0"
+                className="bg-white border border-gray-100 rounded-2xl p-5 animate-fade-up"
                 style={{ animationDelay: `${i * 60}ms`, animationFillMode: 'forwards' }}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center text-lg">
-                    👨‍⚕️
+                    {(doctor.fullName || doctor.full_name || 'Doctor').split(' ').map(part => part[0]).slice(0, 2).join('')}
                   </div>
                   <span className={`text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5
                     ${doctor.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
@@ -203,7 +204,7 @@ export default function AdminDoctors() {
                     onClick={() => handleOpenSchedule(doctor)}
                     className="flex-1 py-2 rounded-xl text-xs font-medium transition border border-gray-200 text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-1.5"
                   >
-                    ⏱ Set Schedule
+                    Set schedule
                   </button>
                   <button
                     onClick={() => { setFeeModal(doctor); setFeeValue(doctor.consultation_fee != null ? String(doctor.consultation_fee) : '') }}
@@ -249,8 +250,8 @@ export default function AdminDoctors() {
                 { key: 'consultationFee', label: 'Consultation fee in ₹ (optional)', placeholder: 'e.g. 500 — leave empty to hide fees', type: 'number' },
               ].map(field => (
                 <div key={field.key}>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">{field.label}</label>
-                  <input
+                  <label htmlFor={`doctor-${field.key}`} className="block text-xs font-medium text-gray-600 mb-1">{field.label}</label>
+                  <input id={`doctor-${field.key}`}
                     type={field.type}
                     min={field.type === 'number' ? 0 : undefined}
                     value={form[field.key]}
@@ -299,7 +300,7 @@ export default function AdminDoctors() {
             </p>
             <div className="flex items-center gap-2 mb-4">
               <span className="text-gray-500 font-semibold">₹</span>
-              <input
+              <input aria-label="Consultation fee in rupees"
                 type="number"
                 min="0"
                 autoFocus
@@ -309,6 +310,7 @@ export default function AdminDoctors() {
                 className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent"
               />
             </div>
+            {error && <p role="alert" className="mb-3 text-sm text-red-700">{error}</p>}
             <div className="flex gap-2">
               <button type="button" onClick={() => setFeeModal(null)}
                 className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition">
@@ -414,8 +416,8 @@ export default function AdminDoctors() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Start Time</label>
-                  <input
+                  <label htmlFor="admindoctors-field-1" className="block text-xs font-medium text-gray-600 mb-1">Start Time</label>
+                  <input id="admindoctors-field-1"
                     type="time"
                     required
                     value={scheduleForm.startTime}
@@ -424,8 +426,8 @@ export default function AdminDoctors() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">End Time</label>
-                  <input
+                  <label htmlFor="admindoctors-field-2" className="block text-xs font-medium text-gray-600 mb-1">End Time</label>
+                  <input id="admindoctors-field-2"
                     type="time"
                     required
                     value={scheduleForm.endTime}
@@ -436,8 +438,8 @@ export default function AdminDoctors() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Slot Duration (Mins)</label>
-                <input
+                <label htmlFor="admindoctors-field-3" className="block text-xs font-medium text-gray-600 mb-1">Slot Duration (Mins)</label>
+                <input id="admindoctors-field-3"
                   type="number"
                   required
                   min="5"

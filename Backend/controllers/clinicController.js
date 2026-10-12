@@ -1,9 +1,11 @@
+import { emailLookup } from '../utils/emailLookup.js'
+import { subscriptionPeriod } from "../services/subscriptionPeriod.js";
 import supabase from "../config/supabase.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { buildClinicUrl } from "../utils/clinicUrl.js";
 import { invalidateTenantCache, EARLY_ACCESS, requestHost } from "../middleware/tenant.js";
-import { entitlementsFor } from "../config/plans.js";
+import { entitlementsFor, planConfig } from "../config/plans.js";
 
 // Slug validation: lowercase a-z, 0-9, hyphens only, 3-50 chars
 const SLUG_REGEX = /^[a-z0-9][a-z0-9-]{2,49}$/;
@@ -21,11 +23,12 @@ async function generateUniqueSlug(name) {
   const base = slugify(name) || "clinic";
   let candidate = base.length >= 3 ? base : `${base}-clinic`;
   for (let i = 2; ; i++) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("clinics")
       .select("id")
       .eq("slug", candidate)
       .maybeSingle();
+    if (error) throw error;
     if (!data) return candidate;
     candidate = `${base}-${i}`;
   }
@@ -40,12 +43,13 @@ async function generateUniqueSlug(name) {
  */
 export const registerClinic = async (req, res) => {
   try {
-    const { name, ownerName, ownerEmail, password, address, specialization } =
+    const { name, ownerName, password, address, specialization } =
       req.body;
     let { slug } = req.body;
+    const ownerEmail = typeof req.body.ownerEmail === 'string' ? req.body.ownerEmail.trim().toLowerCase() : '';
 
     // --- Validation ---
-    if (!name || !ownerEmail || !password) {
+    if (typeof name !== 'string' || !name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail) || typeof password !== 'string' || !password) {
       return res.status(400).json({
         success: false,
         message: "Clinic name, owner email, and password are required.",
@@ -72,12 +76,13 @@ export const registerClinic = async (req, res) => {
     }
 
     // Check slug uniqueness
-    const { data: existingClinic } = await supabase
+    const { data: existingClinic, error: slugError } = await supabase
       .from("clinics")
       .select("id")
       .eq("slug", slug)
-      .single();
+      .maybeSingle();
 
+    if (slugError) throw slugError;
     if (existingClinic) {
       return res.status(409).json({
         success: false,
@@ -86,18 +91,23 @@ export const registerClinic = async (req, res) => {
     }
 
     // Check email uniqueness (owner email must be unique across admins)
-    const { data: existingAdmin } = await supabase
+    const { data: existingAdmin, error: emailError } = await supabase
       .from("admins")
       .select("id")
-      .eq("email", ownerEmail)
-      .single();
+      .ilike("email", emailLookup(ownerEmail))
+      .limit(1)
+      .maybeSingle();
 
+    if (emailError) throw emailError;
     if (existingAdmin) {
       return res.status(409).json({
         success: false,
         message: "An admin with this email already exists.",
       });
     }
+
+    // Hash before creating rows so a hashing failure cannot leave a clinic behind.
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     // --- Create clinic ---
     const { data: clinic, error: clinicError } = await supabase
@@ -124,7 +134,6 @@ export const registerClinic = async (req, res) => {
     }
 
     // --- Create admin ---
-    const hashedPassword = await bcrypt.hash(password, 12);
 
     const { data: admin, error: adminError } = await supabase
       .from("admins")
@@ -139,11 +148,17 @@ export const registerClinic = async (req, res) => {
 
     if (adminError || !admin) {
       console.error("Admin creation error:", adminError);
-      // Note: clinic row already exists but has no admin — this is a
-      // degraded state. In production, wrap in a transaction.
-      return res.status(500).json({
+      // Roll back this newly-created clinic only after confirming no admin was
+      // saved. A transport error can be ambiguous; never delete a linked clinic.
+      const {data:linkedAdmins,error:lookupError} = await supabase.from('admins').select('id').eq('clinic_id',clinic.id).limit(1);
+      let cleaned = false;
+      if (!lookupError && linkedAdmins?.length === 0) {
+        const {error:cleanupError} = await supabase.from('clinics').delete().eq('id',clinic.id);
+        cleaned = !cleanupError;
+      }
+      return res.status(adminError?.code === '23505' ? 409 : 500).json({
         success: false,
-        message: "Clinic created but admin account failed. Contact support.",
+        message: cleaned ? 'Registration could not finish. Check your email address and try again.' : 'Registration could not finish. Contact support before trying again.',
       });
     }
 
@@ -194,6 +209,7 @@ export const updateBranding = async (req, res) => {
   try {
     const clinicId = req.admin.clinic_id
     const { clinic_name, primary_color, logo_url, tagline, badges } = req.body
+    if (!EARLY_ACCESS && !planConfig(req.clinicPlan).features.customBranding) return res.status(403).json({success:false,message:'Custom branding requires the Growth or Pro plan.'})
 
     if (!clinic_name && !primary_color && !logo_url && !tagline && badges === undefined) {
       return res.status(400).json({
@@ -371,16 +387,15 @@ export const getMyClinic = async (req, res) => {
 
     // select("*") + whitelist below so a not-yet-migrated column
     // (e.g. operating_hours) can never break this endpoint
-    const [{ data: clinic, error }, { data: activeSub }] = await Promise.all([
+    const [{ data: clinic, error }, { data: subscriptions, error: subscriptionError }] = await Promise.all([
       supabase.from("clinics").select("*").eq("id", clinicId).single(),
       supabase
         .from("subscriptions")
-        .select("plan, status")
+        .select("plan, status, ends_at, next_billing_date")
         .eq("clinic_id", clinicId)
         .eq("status", "active")
         .order("updated_at", { ascending: false })
-        .limit(1)
-        .then((r) => ({ data: r.data?.[0] || null }), () => ({ data: null })),
+        .limit(1),
     ])
 
     if (error || !clinic) {
@@ -393,7 +408,10 @@ export const getMyClinic = async (req, res) => {
     // A clinic is "paid" when Early Access is on, or it has an active
     // subscription. The billing page uses this to show the current plan
     // vs. a "choose a plan" prompt.
-    const subscriptionActive = EARLY_ACCESS || !!activeSub
+    if (subscriptionError) return res.status(503).json({ success: false, message: "Unable to verify your subscription. Please try again." })
+    const activeSub = subscriptions?.[0] || null
+    const period = subscriptionPeriod(activeSub)
+    const subscriptionActive = EARLY_ACCESS || period.active
 
 
     // The plan shown to the admin. Prefer the active subscription's plan;
@@ -419,10 +437,12 @@ export const getMyClinic = async (req, res) => {
         is_active: clinic.is_active,
         subscription_plan: subscriptionActive ? activePlan : null,
         subscription_active: subscriptionActive,
+        subscription_status: EARLY_ACCESS ? "early_access" : period.status,
+        subscription_ends_at: period.endsAt,
         early_access: EARLY_ACCESS,
         // Plan entitlements — the frontend gates features on `features.*`.
         // Only meaningful once subscription_active is true.
-        entitlements: entitlementsFor({ subscription_plan: entitlementPlan }),
+        entitlements: entitlementsFor({ subscription_plan: entitlementPlan, subscription_active: subscriptionActive }),
         subdomain_url: buildClinicUrl(clinic.slug),
       },
     })

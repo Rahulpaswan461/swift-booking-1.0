@@ -18,9 +18,9 @@ export default function Logo({ size = 'md', showClinicName = false }) {
           className="w-9 h-9 rounded-full object-cover shadow-sm border border-brand-100"
         />
       ) : (
-        <span className="w-9 h-9 rounded-full bg-brand-600 flex items-center justify-center shadow-sm shadow-brand-600/20">
+        <span className="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center shadow-sm shadow-brand-600/20">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M8 2v12M2 8h12" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+            <path d="M8 2v12M2 8h12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
           </svg>
         </span>
       )}

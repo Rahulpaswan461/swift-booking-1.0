@@ -1,3 +1,4 @@
+import supabase from "../config/supabase.js"
 import jwt from "jsonwebtoken"
 
 export const protect = async (req, res, next) => {
@@ -11,6 +12,9 @@ export const protect = async (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET)
+        if (!decoded.patient_id || decoded.role || !decoded.clinic_id || decoded.clinic_id !== req.tenant?.id) {
+            return res.status(401).json({success:false,message:'Please verify your identity at this clinic.',code:'token_invalid'})
+        }
         req.patient = decoded;
         next()
     }
@@ -26,10 +30,9 @@ export const protect = async (req, res, next) => {
     }
 }
 
-export const protectDoctor = (req, res, next) => {
+export const protectDoctor = async (req, res, next) => {
     const authHeader = req.headers.authorization
 
-    if (req.path === '/api/doctors/login' || req.path === 'api/doctors/create') return next()
 
     if (!authHeader?.startsWith('Bearer ')) {
         return res.status(401).json({ success: false, message: 'No token provided. ' })
@@ -50,6 +53,9 @@ export const protectDoctor = (req, res, next) => {
             return res.status(403).json({ success: false, message: "Invalid session — missing clinic context. Please log in again." })
         }
 
+        const {data:doctor,error} = await supabase.from('doctors').select('id,is_active').eq('id',decoded.id).eq('clinic_id',decoded.clinic_id).maybeSingle()
+        if (error) return res.status(503).json({success:false,message:'Unable to verify your account. Please try again.'})
+        if (!doctor?.is_active) return res.status(403).json({success:false,message:'Your doctor account is inactive. Contact your clinic administrator.'})
         req.doctor = decoded;
 
         next();

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ClinicProvider, useClinic } from './context/ClinicContext'
@@ -29,14 +30,14 @@ import PatientHistory      from './pages/PatientHistory'
 import DoctorLogin     from './pages/doctor/DoctorLogin'
 import DoctorForgotPassword from './pages/doctor/ForgotPassword'
 import ChangePassword  from './pages/doctor/ChangePassword'
-import DoctorDashboard from './pages/doctor/DoctorDashboard'
+const DoctorDashboard = lazy(() => import('./pages/doctor/DoctorDashboard'))
 
 // Admin pages
 import AdminLogin        from './pages/admin/AdminLogin'
 import AdminForgotPassword from './pages/admin/ForgotPassword'
 import RegisterClinic    from './pages/admin/RegisterClinic'
-import AdminDashboard    from './pages/admin/AdminDashboard'
-import AdminAppointments from './pages/admin/AdminAppointments'
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const AdminAppointments = lazy(() => import('./pages/admin/AdminAppointments'))
 import AdminDoctors      from './pages/admin/AdminDoctors'
 import BrandingSettings  from './pages/admin/BrandingSettings'
 import BillingPage       from './pages/admin/BillingPage'
@@ -122,11 +123,11 @@ export default function App() {
             <Route path="/doctor/login"            element={<DoctorLogin />} />
             <Route path="/doctor/forgot-password"  element={<DoctorForgotPassword />} />
             <Route path="/doctor/change-password"  element={<DoctorRoute><ChangePassword /></DoctorRoute>} />
-            <Route path="/doctor/dashboard"        element={<DoctorRoute><DoctorDashboard /></DoctorRoute>} />
+            <Route path="/doctor/dashboard"        element={<DoctorRoute><Suspense fallback={<div className="p-10 text-gray-500" role="status">Opening your dashboard…</div>}><DoctorDashboard /></Suspense></DoctorRoute>} />
 
             {/* ── Admin flow (authenticated) ───────────────── */}
-            <Route path="/admin/dashboard"    element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-            <Route path="/admin/appointments" element={<AdminRoute><AdminAppointments /></AdminRoute>} />
+            <Route path="/admin/dashboard"    element={<AdminRoute><Suspense fallback={<div className="p-10 text-gray-500" role="status">Opening your dashboard…</div>}><AdminDashboard /></Suspense></AdminRoute>} />
+            <Route path="/admin/appointments" element={<AdminRoute><Suspense fallback={<div className="p-10 text-gray-500" role="status">Opening your dashboard…</div>}><AdminAppointments /></Suspense></AdminRoute>} />
             <Route path="/admin/doctors/create" element={<AdminRoute><AdminDoctors /></AdminRoute>} />
             <Route path="/admin/branding"     element={<AdminRoute><BrandingSettings /></AdminRoute>} />
             <Route path="/admin/billing"      element={<AdminRoute><BillingPage /></AdminRoute>} />

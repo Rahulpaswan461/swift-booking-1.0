@@ -1,6 +1,8 @@
+import { DodoConfigurationError } from "../config/dodo.js"
 import supabase from "../config/supabase.js"
 import { dodoConfigured, createSubscriptionCheckout, verifyDodoSignature, handleDodoEvent, verifyAndActivateSubscription } from "../services/dodoPayments.js"
-import { normalizePlan } from "../config/plans.js"
+import { CheckoutError, checkoutPlan } from "../services/dodoCheckout.js"
+import { randomUUID } from "node:crypto"
 import { buildClinicUrl } from "../utils/clinicUrl.js"
 
 /**
@@ -36,24 +38,20 @@ function resolveReturnUrl(clinic, requestedOrigin) {
  */
 export const createCheckout = async (req, res) => {
   try {
-    if (!dodoConfigured()) {
-      return res.status(503).json({
-        success: false,
-        message: "Payments aren't enabled yet — contact support to upgrade your plan.",
-      })
-    }
-
     const { plan, returnOrigin } = req.body
-    if (!["basic", "growth", "pro"].includes(normalizePlan(plan)) || !plan) {
+    if (!checkoutPlan(plan)) {
       return res.status(400).json({ success: false, message: "Choose a valid plan: basic, growth, or pro." })
     }
 
-    const { data: clinic } = await supabase
+    const { data: clinic, error: clinicError } = await supabase
       .from("clinics")
       .select("id, name, slug, subscription_plan")
       .eq("id", req.admin.clinic_id)
       .single()
 
+    if (clinicError && clinicError.code !== 'PGRST116') {
+      throw new CheckoutError('billing_lookup_failed', 'Your clinic details could not be loaded. Please try again shortly.', 503)
+    }
     if (!clinic) {
       return res.status(404).json({ success: false, message: "Clinic not found." })
     }
@@ -67,10 +65,14 @@ export const createCheckout = async (req, res) => {
 
     return res.status(200).json({ success: true, url })
   } catch (error) {
-    console.error("createCheckout error:", error.message)
-    return res.status(502).json({
+    const reference = randomUUID()
+    const known = error instanceof CheckoutError || error instanceof DodoConfigurationError
+    console.error("createCheckout error:", { reference, code: known ? error.code : 'checkout_failed', ...(error.diagnostics || {}) })
+    return res.status(known ? error.status : 502).json({
       success: false,
-      message: "Couldn't start the checkout. Please try again or contact support.",
+      code: known ? error.code : 'checkout_failed',
+      reference,
+      message: known ? error.message : "Checkout could not be opened. Please try again or contact platform support with the reference below.",
     })
   }
 }

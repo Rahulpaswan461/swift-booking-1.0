@@ -1,4 +1,7 @@
-import crypto from "crypto"
+export { verifyDodoSignature } from "./dodoWebhookSignature.js"
+import { dodoConfig } from "../config/dodo.js"
+import { createHostedCheckout } from "./dodoCheckout.js"
+import { subscriptionPeriod } from "./subscriptionPeriod.js"
 import supabase from "../config/supabase.js"
 import { normalizePlan, planConfig } from "../config/plans.js"
 import { invalidateSubscriptionCache } from "../middleware/tenant.js"
@@ -17,22 +20,11 @@ import { sendPaymentSuccessEmail } from "./emailService.js"
  *     — product ids of the three subscription products created in the dashboard
  */
 
-// Trim stray whitespace/commas/slashes — a pasted trailing character in
-// .env otherwise produces an invalid hostname and a bare "fetch failed"
-const API_BASE = (process.env.DODO_API_BASE || "https://test.dodopayments.com")
-  .trim()
-  .replace(/[,/\s]+$/, "")
-
-function productIdFor(plan) {
-  return {
-    basic: process.env.DODO_PRODUCT_BASIC,
-    growth: process.env.DODO_PRODUCT_GROWTH,
-    pro: process.env.DODO_PRODUCT_PRO,
-  }[plan]
-}
-
 export function dodoConfigured() {
-  return !!(process.env.DODO_API_KEY && process.env.DODO_WEBHOOK_SECRET)
+  try {
+    const config = dodoConfig()
+    return !!(config.apiKey && config.webhookSecret)
+  } catch { return false }
 }
 
 /**
@@ -40,57 +32,11 @@ export function dodoConfigured() {
  * The clinic_id and plan ride along as metadata and come back in webhooks.
  */
 export async function createSubscriptionCheckout({ plan, clinic, adminEmail, returnUrl: returnUrlOverride }) {
-  const normalized = normalizePlan(plan)
-  const productId = productIdFor(normalized)
-  if (!productId) {
-    throw new Error(`No Dodo product configured for the ${normalized} plan (set DODO_PRODUCT_${normalized.toUpperCase()})`)
-  }
-
-  // Return the admin to the SAME origin they started checkout from (validated
-  // by the caller), so their session token — which is per-origin — is still
-  // present when they land back. Falls back to the clinic subdomain.
   const returnUrl = returnUrlOverride
     || (clinic?.slug
       ? buildClinicUrl(clinic.slug, "/admin/billing?from=checkout")
       : `${process.env.FRONTEND_URL || ""}/admin/billing?from=checkout`)
-
-  const res = await fetch(`${API_BASE}/subscriptions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.DODO_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      product_id: productId,
-      quantity: 1,
-      payment_link: true,
-      return_url: returnUrl,
-      customer: {
-        email: adminEmail,
-        name: clinic?.name || "Clinic admin",
-      },
-      billing: {
-        country: "IN",
-        state: "NA",
-        city: "NA",
-        street: "NA",
-        zipcode: "000000",
-      },
-      metadata: {
-        clinic_id: clinic.id,
-        plan: normalized,
-      },
-    }),
-  })
-
-  const body = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    throw new Error(`Dodo ${res.status}: ${body.message || body.error || "checkout creation failed"}`)
-  }
-
-  const url = body.payment_link || body.payment_link_url || body.checkout_url
-  if (!url) throw new Error("Dodo response contained no payment link")
-  return { url, subscription_id: body.subscription_id || null }
+  return createHostedCheckout({ plan, clinic, adminEmail, returnUrl })
 }
 
 /**
@@ -99,8 +45,10 @@ export async function createSubscriptionCheckout({ plan, clinic, adminEmail, ret
  * (e.g. on localhost, where Dodo can't reach the dev machine).
  */
 export async function fetchSubscription(subscriptionId) {
-  const res = await fetch(`${API_BASE}/subscriptions/${subscriptionId}`, {
-    headers: { Authorization: `Bearer ${process.env.DODO_API_KEY}` },
+  const config = dodoConfig()
+  const res = await fetch(`${config.apiBase}/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    headers: { Authorization: `Bearer ${config.apiKey}` },
+    signal: AbortSignal.timeout(15_000),
   })
   const body = await res.json().catch(() => ({}))
   if (!res.ok) {
@@ -123,9 +71,9 @@ const ACTIVE_SUB_STATUSES = new Set(["active", "activated", "renewed", "trialing
 export async function verifyAndActivateSubscription(subscriptionId, expectedClinicId) {
   const sub = await fetchSubscription(subscriptionId)
   const status = String(sub.status || "").toLowerCase()
-  const clinicId = sub.metadata?.clinic_id || expectedClinicId
+  const clinicId = sub.metadata?.clinic_id
 
-  if (expectedClinicId && clinicId && clinicId !== expectedClinicId) {
+  if (!clinicId || (expectedClinicId && clinicId !== expectedClinicId)) {
     throw new Error("Subscription does not belong to this clinic")
   }
   if (!ACTIVE_SUB_STATUSES.has(status)) {
@@ -134,7 +82,7 @@ export async function verifyAndActivateSubscription(subscriptionId, expectedClin
 
   const plan = normalizePlan(sub.metadata?.plan)
   const providerSubId = sub.subscription_id || sub.id || subscriptionId
-  await activateClinicSubscription({
+  const period = await activateClinicSubscription({
     clinicId,
     plan,
     providerSubId,
@@ -151,7 +99,7 @@ export async function verifyAndActivateSubscription(subscriptionId, expectedClin
     console.error("[Dodo] payment ledger sync failed on verify:", err.message)
   }
 
-  return { active: true, plan, status }
+  return { active: period.active, plan, status: period.status }
 }
 
 /** Postgres unique-constraint violation, however the client surfaces it. */
@@ -196,6 +144,18 @@ async function upsertByProviderId(table, column, value, record, orderBy) {
 
 export async function activateClinicSubscription({ clinicId, plan, providerSubId, nextBillingDate, eventType }) {
   const nowIso = new Date().toISOString()
+  // Some payment events omit the renewal boundary. Resolve it from the
+  // provider rather than clearing the current period or inventing a month.
+  if (!nextBillingDate && providerSubId) {
+    try { nextBillingDate = (await fetchSubscription(providerSubId)).next_billing_date || null }
+    catch (error) { console.error('[Dodo] renewal date verification unavailable:', error.message) }
+  }
+  let previous = null
+  if (providerSubId) {
+    const { data, error } = await supabase.from('subscriptions').select('ends_at, next_billing_date').eq('provider_subscription_id', providerSubId).eq('clinic_id', clinicId).limit(1)
+    if (error) throw new Error('Unable to verify the existing subscription period')
+    previous = data?.[0] || null
+  }
 
   // 1. Expire any *other* active subscription for this clinic, so the
   //    "one active per clinic" invariant holds before we activate this one.
@@ -219,7 +179,7 @@ export async function activateClinicSubscription({ clinicId, plan, providerSubId
     status: "active",
     provider: "dodo",
     provider_subscription_id: providerSubId,
-    next_billing_date: nextBillingDate,
+    ...(nextBillingDate ? { next_billing_date: nextBillingDate } : {}),
     metadata: { event_type: eventType },
     updated_at: nowIso,
   }
@@ -238,7 +198,9 @@ export async function activateClinicSubscription({ clinicId, plan, providerSubId
   await supabase.from("clinics").update({ subscription_plan: plan }).eq("id", clinicId)
 
   invalidateSubscriptionCache(clinicId)
-  console.log(`[Dodo] Clinic ${clinicId} → ${plan} active (${eventType})`)
+  const period = subscriptionPeriod({ ...previous, ...record })
+  console.log(`[Dodo] Subscription synchronized (${period.status}, ${eventType})`)
+  return period
 }
 
 /**
@@ -315,8 +277,10 @@ function ledgerStatusForPayment(payment) {
 export async function syncPaymentsForSubscription(subscriptionId, clinicId) {
   if (!subscriptionId || !clinicId) return { synced: 0 }
 
-  const res = await fetch(`${API_BASE}/payments?subscription_id=${encodeURIComponent(subscriptionId)}`, {
-    headers: { Authorization: `Bearer ${process.env.DODO_API_KEY}` },
+  const config = dodoConfig()
+  const res = await fetch(`${config.apiBase}/payments?subscription_id=${encodeURIComponent(subscriptionId)}`, {
+    headers: { Authorization: `Bearer ${config.apiKey}` },
+    signal: AbortSignal.timeout(15_000),
   })
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(`Dodo ${res.status}: ${body.message || "fetch payments failed"}`)
@@ -396,49 +360,6 @@ async function findSubscriptionOwner(providerSubId) {
  * HMAC-SHA256 over `${id}.${timestamp}.${rawBody}` with the base64 part
  * of the whsec_ secret; signature header holds "v1,<base64>" entries.
  */
-export function verifyDodoSignature(rawBody, headers) {
-  const secret = process.env.DODO_WEBHOOK_SECRET
-  if (!secret) {
-    console.warn("[Dodo sig] no DODO_WEBHOOK_SECRET configured")
-    return false
-  }
-
-  const id = headers["webhook-id"]
-  const timestamp = headers["webhook-timestamp"]
-  const signatureHeader = headers["webhook-signature"]
-  if (!id || !timestamp || !signatureHeader) {
-    console.warn("[Dodo sig] missing signature headers", { id: !!id, timestamp: !!timestamp, signature: !!signatureHeader })
-    return false
-  }
-
-  // Reject stale deliveries (>5 min) to prevent replay
-  const age = Math.abs(Date.now() / 1000 - Number(timestamp))
-  if (!Number.isFinite(age) || age > 300) {
-    console.warn("[Dodo sig] timestamp rejected (stale or unparseable)", { timestamp, ageSeconds: age })
-    return false
-  }
-
-  const secretBytes = Buffer.from(secret.replace(/^whsec_/, ""), "base64")
-  const signedContent = `${id}.${timestamp}.${rawBody}`
-  const expected = crypto.createHmac("sha256", secretBytes).update(signedContent).digest("base64")
-
-  const matched = signatureHeader.split(" ").some((part) => {
-    const sig = part.includes(",") ? part.split(",")[1] : part
-    try {
-      return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))
-    } catch {
-      return false
-    }
-  })
-  if (!matched) {
-    console.warn("[Dodo sig] HMAC mismatch — check DODO_WEBHOOK_SECRET matches the endpoint's secret", {
-      expectedPrefix: expected.slice(0, 8),
-      headerPrefix: signatureHeader.slice(0, 24),
-    })
-  }
-  return matched
-}
-
 /**
  * Apply a webhook event to our records. Activation events upgrade the
  * clinic's plan; termination events mark the subscription inactive

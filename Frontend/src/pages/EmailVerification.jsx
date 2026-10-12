@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../api/axios'
 import Logo from '../components/Logo'
 import StepIndicator from '../components/StepIndicator'
@@ -18,6 +18,7 @@ export default function EmailVerification() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const { state } = useLocation()
   const { saveContact } = useAuth()
   const { clinicName } = useClinic()
 
@@ -48,7 +49,7 @@ export default function EmailVerification() {
       return
     }
     saveContact?.(contactValue.trim(), contactType)
-    navigate('/verify-otp')
+    navigate('/verify-otp', { state })
   }
 
   return (

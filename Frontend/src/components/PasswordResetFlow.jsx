@@ -102,7 +102,7 @@ export default function PasswordResetFlow({ role }) {
     <div className="flex min-h-screen flex-col bg-surface-50">
       <header className="flex items-center justify-between border-b border-white/70 bg-white/80 px-6 py-5 backdrop-blur-xl sm:px-8">
         <Logo />
-        <span className="rounded-full border border-brand-100 bg-brand-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-brand-700">
+        <span className="rounded-full border border-brand-100 bg-brand-50 text-brand-600 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-brand-700">
           {config.badge}
         </span>
       </header>
@@ -110,11 +110,11 @@ export default function PasswordResetFlow({ role }) {
       <div className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
           <div className="animate-fade-up rounded-[28px] border border-surface-100 bg-white p-8 shadow-xl shadow-gray-900/5 sm:p-10">
-            <div className="mx-auto mb-8 flex h-16 w-16 items-center justify-center rounded-full border border-brand-100 bg-brand-50">
+            <div className="mx-auto mb-8 flex h-16 w-16 items-center justify-center rounded-full border border-brand-100 bg-brand-50 text-brand-600">
               <svg width="28" height="28" viewBox="0 0 22 22" fill="none">
-                <rect x="3" y="9" width="16" height="11" rx="2" stroke="#1d7f72" strokeWidth="1.8" />
-                <path d="M7 9V7a4 4 0 018 0v2" stroke="#1d7f72" strokeWidth="1.8" strokeLinecap="round" />
-                <circle cx="11" cy="14.5" r="1.5" fill="#1d7f72" />
+                <rect x="3" y="9" width="16" height="11" rx="2" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M7 9V7a4 4 0 018 0v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <circle cx="11" cy="14.5" r="1.5" fill="currentColor" />
               </svg>
             </div>
 
@@ -147,10 +147,10 @@ export default function PasswordResetFlow({ role }) {
                 {step === 'request' ? (
                   <form onSubmit={requestCode} className="space-y-5">
                     <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-700">
+                      <label htmlFor="passwordresetflow-field-1" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-700">
                         Email address
                       </label>
-                      <input
+                      <input id="passwordresetflow-field-1"
                         type="email" value={email} required
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder={config.emailPlaceholder}
@@ -172,10 +172,10 @@ export default function PasswordResetFlow({ role }) {
                     {notice && <Alert tone="info">{notice}</Alert>}
 
                     <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-700">
+                      <label htmlFor="passwordresetflow-field-2" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-700">
                         Reset code
                       </label>
-                      <input
+                      <input id="passwordresetflow-field-2"
                         type="text" value={otp} required
                         inputMode="numeric" autoComplete="one-time-code" maxLength={6}
                         onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
@@ -190,11 +190,11 @@ export default function PasswordResetFlow({ role }) {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-700">
+                      <label htmlFor="passwordresetflow-field-3" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-700">
                         New password
                       </label>
                       <div className="relative">
-                        <input
+                        <input id="passwordresetflow-field-3"
                           type={showPassword ? 'text' : 'password'}
                           value={newPassword} required minLength={8}
                           onChange={(e) => setNewPassword(e.target.value)}
@@ -202,7 +202,7 @@ export default function PasswordResetFlow({ role }) {
                           className={`${inputClass} pr-11`}
                         />
                         <button
-                          type="button" onClick={() => setShowPassword(!showPassword)}
+                          type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(!showPassword)}
                           className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-gray-600"
                         >
                           <svg width="18" height="18" viewBox="0 0 16 16" fill="none">

@@ -75,6 +75,11 @@ export function entitlementsFor(clinic) {
     }
   }
 
+  if (clinic?.subscription_active === false) {
+    return { plan: null, plan_label: 'No active plan', max_doctors: 0,
+      features: Object.fromEntries(Object.keys(config.features).map(key => [key, false])) }
+  }
+
   return {
     plan,
     plan_label: config.label,

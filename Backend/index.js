@@ -1,5 +1,11 @@
 import "dotenv/config"
 import express from "express"
+import { createServer } from "node:http"
+import supabase from "./config/supabase.js"
+import { isAllowedOrigin } from "./config/origins.js"
+import { createRealtimeServer } from "./realtime/server.js"
+import { createStaffAuthenticator } from "./realtime/auth.js"
+import { loadClinicSubscription } from "./middleware/tenant.js"
 import AppointmentRouter from "./routes/Appointment.js"
 import { PatientDoctorRouter, DoctorAuthRouter } from "./routes/Doctor.js"
 import OtpRouter from "./routes/OtpRouter.js"
@@ -7,6 +13,7 @@ import AdminRouter from "./routes/Admin.js"
 import { resolveClinic } from "./controllers/clinicController.js"
 import { resolveTenant, enforceSubscription, enforcePlanLimits } from "./middleware/tenant.js"
 import { auditMiddleware } from "./utils/auditLogger.js"
+import { startDatabaseMaintenanceJob } from "./services/databaseMaintenance.js"
 import { startReminderJob } from "./services/reminder.js"
 import { startFounderDigestJob } from "./services/founderDigest.js"
 import { submitSupportRequest } from "./controllers/supportController.js"
@@ -33,22 +40,8 @@ app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }))
 // Allow the platform domain and every clinic subdomain, in dev and prod.
 // e.g. http://localhost:5173, http://apollo.localhost:5173,
 //      https://healibrate.com, https://apollo.healibrate.com
-const APP_BASE_DOMAIN = (process.env.APP_BASE_DOMAIN || "healibrate.com").split(":")[0]
-const CORS_EXTRA = ["https://swift-booking-1-0.vercel.app"]
 app.use(cors({
-    origin(origin, cb) {
-        if (!origin) return cb(null, true) // curl, server-to-server
-        try {
-            const { hostname } = new URL(origin)
-            const allowed =
-                hostname === "localhost" || hostname.endsWith(".localhost") ||
-                hostname === APP_BASE_DOMAIN || hostname.endsWith(`.${APP_BASE_DOMAIN}`) ||
-                CORS_EXTRA.includes(origin)
-            return cb(null, allowed)
-        } catch {
-            return cb(null, false)
-        }
-    },
+    origin: (origin, cb) => cb(null, isAllowedOrigin(origin)),
     credentials: true
 }))
 
@@ -91,7 +84,23 @@ app.use("/api", tenantRouter)
 app.use(notFoundHandler)
 app.use(errorHandler)
 
-app.listen(PORT, () => {
+const httpServer = createServer(app)
+const realtime = createRealtimeServer(httpServer, {
+    authenticate: createStaffAuthenticator({
+        secret: process.env.JWT_SECRET,
+        db: supabase,
+        loadSubscription: loadClinicSubscription,
+        earlyAccess: EARLY_ACCESS,
+    }),
+    allowedOrigin: isAllowedOrigin,
+})
+
+process.on("SIGTERM", () => {
+    realtime.close(() => process.exit(0))
+    setTimeout(() => process.exit(0), 10_000).unref()
+})
+
+httpServer.listen(PORT, () => {
     log.info(`Server listening on port ${PORT}`)
 
     // One-glance env sanity — makes a misconfigured deploy obvious at boot
@@ -101,6 +110,7 @@ app.listen(PORT, () => {
         baseDomain: process.env.APP_BASE_DOMAIN || "(default healibrate.com)",
         supabase: process.env.SUPABASE_URL ? "configured" : "MISSING",
         payments: dodoConfigured() ? "configured" : "not configured",
+        paymentApi: process.env.DODO_API_BASE || "https://test.dodopayments.com",
         billingEnforced: EARLY_ACCESS ? "no (early access / beta)" : "yes",
         email: process.env.RESEND_API_KEY ? "resend" : "MISSING",
     })
@@ -113,4 +123,5 @@ app.listen(PORT, () => {
     startReminderJob()
     // Weekly founder digest (Mondays, 09:00 local by default)
     startFounderDigestJob()
+    startDatabaseMaintenanceJob()
 })

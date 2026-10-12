@@ -24,11 +24,11 @@ export default function CancelAppointment() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    api.get(`/appointments/${id}`)
+    api.get(`/appointments/${id}`, { headers: { 'X-Appointment-Token': cancelToken } })
       .then((res) => setAppointment(res.data.data))
       .catch(() => setAppointment(null))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, cancelToken]);
 
   const handleCancel = async () => {
     setStatus('loading');

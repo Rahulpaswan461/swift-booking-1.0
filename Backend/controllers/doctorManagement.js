@@ -1,3 +1,4 @@
+import { emailLookup } from '../utils/emailLookup.js'
 import supabase from "../config/supabase.js"
 import bcrypt from "bcrypt"
 import { sendWelcomeEmail } from "../services/emailService.js"
@@ -11,9 +12,10 @@ import { buildClinicUrl } from "../utils/clinicUrl.js"
 export const createDoctorForClinic = async (req, res) => {
   try {
     const clinicId = req.admin.clinic_id
-    const { fullName, email, specialization, consultationFee } = req.body
+    const { fullName, specialization, consultationFee } = req.body
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : ''
 
-    if (!fullName || !email || !specialization) {
+    if (typeof fullName !== 'string' || !fullName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || typeof specialization !== 'string' || !specialization.trim()) {
       return res.status(400).json({
         success: false,
         message: "Full name, email, and specialization are required.",
@@ -22,7 +24,7 @@ export const createDoctorForClinic = async (req, res) => {
 
     if (consultationFee !== undefined && consultationFee !== null && consultationFee !== "") {
       const fee = Number(consultationFee)
-      if (Number.isNaN(fee) || fee < 0) {
+      if (!Number.isFinite(fee) || fee < 0) {
         return res.status(400).json({
           success: false,
           message: "Consultation fee must be a positive number.",
@@ -42,12 +44,14 @@ export const createDoctorForClinic = async (req, res) => {
     }
 
     // Check if a doctor with this email already exists
-    const { data: existing } = await supabase
+    const { data: existing, error: emailError } = await supabase
       .from("doctors")
       .select("id")
-      .eq("email", email)
-      .single()
+      .ilike("email", emailLookup(email))
+      .limit(1)
+      .maybeSingle()
 
+    if (emailError) throw emailError
     if (existing) {
       return res.status(409).json({
         success: false,
@@ -89,7 +93,7 @@ export const createDoctorForClinic = async (req, res) => {
 
     if (createError || !doctor) {
       console.error("Error creating doctor:", createError,'doctors response ', doctor)
-      return res.status(500).json({ success: false, message: "Failed to create doctor." })
+      return res.status(createError?.code === "23505" ? 409 : 500).json({ success: false, message: createError?.code === "23505" ? "A doctor with this email already exists." : "Failed to create doctor." })
     }
 
     // Send credentials via email in the background — login URL is the
@@ -187,7 +191,7 @@ export const updateDoctorForClinic = async (req, res) => {
         updateData.consultation_fee = null // clinic disabled the fee display
       } else {
         const fee = Number(consultationFee)
-        if (Number.isNaN(fee) || fee < 0) {
+        if (!Number.isFinite(fee) || fee < 0) {
           return res.status(400).json({ success: false, message: "Consultation fee must be a positive number." })
         }
         updateData.consultation_fee = fee

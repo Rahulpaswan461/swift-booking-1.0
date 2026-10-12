@@ -1,3 +1,6 @@
+import { emailLookup } from '../utils/emailLookup.js'
+import { getRosterPage } from '../services/doctorRoster.js'
+import { notifyAppointmentChange } from "../realtime/server.js"
 import supabase from "../config/supabase.js"
 import jwt from "jsonwebtoken"
 import bcrypt from 'bcrypt'
@@ -17,7 +20,7 @@ export const doctorLogin = async (req, res) => {
         const { data: doctor, error } = await supabase
             .from('doctors')
             .select('*')
-            .eq('email', email)
+            .ilike('email', emailLookup(email))
             .single()
 
         if (error || !doctor) {
@@ -150,7 +153,7 @@ export const getDoctor = async (req, res) => {
         const { data: doctor, error } = await supabase
             .from('doctors')
             .select('id, full_name, email, specialization, qualification, is_active')
-            .eq('email', email)
+            .ilike('email', emailLookup(email))
             .single()
 
         if (error || !doctor) {
@@ -220,23 +223,34 @@ export const getDoctorAppointments = async (req, res) => {
         const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
         const date = req.query.date || localToday
 
-        const { data: appointments, error } = await supabase
-            .from('appointments')
-            .select(`
-                *,
-                patients (name, email, phone)
-            `)
-            .eq('doctor_id', doctorId)
-            .eq('appointment_date', date)
-            .neq('status', 'cancelled')
-            .order('appointment_time', { ascending: true })
-
-        if (error) throw error
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) {
+            return res.status(400).json({ success: false, message: 'Please provide a valid appointment date.' })
+        }
+        // Fetch only this day and the fields rendered by the dashboard. Paging
+        // also avoids silently losing rows to the Supabase Data API row cap.
+        const appointments = []
+        const pageSize = 500
+        for (let offset = 0; ; offset += pageSize) {
+            const { data: rows, error } = await supabase
+                .from('appointments')
+                .select('id, patient_id, appointment_date, appointment_time, status, notes, patients(id, name, email, phone)')
+                .eq('doctor_id', doctorId)
+                .eq('clinic_id', req.doctor.clinic_id)
+                .eq('appointment_date', date)
+                .neq('status', 'cancelled')
+                .order('appointment_time', { ascending: true })
+                .order('id', { ascending: true })
+                .range(offset, offset + pageSize - 1)
+            if (error) throw error
+            appointments.push(...(rows || []))
+            if (!rows || rows.length < pageSize) break
+        }
+        res.set('Cache-Control', 'no-store')
 
         // Summary of appointments
         const total = appointments.length
         const completed = appointments.filter(a => a.status === "completed").length
-        const pending = appointments.filter(a => a.status === "pending").length
+        const pending = appointments.filter(a => a.status === "confirmed").length
         const noShow = appointments.filter(a => a.status === "no_show").length
 
         return res.status(200).json({
@@ -247,9 +261,12 @@ export const getDoctorAppointments = async (req, res) => {
                 completed,
                 pending,
                 noShow,
+                no_show: noShow,
                 data: appointments.map(a => ({
                     id: a.id,
+                    appointment_date: a.appointment_date,
                     patient: {
+                        id: a.patient_id,
                         name: a.patients?.name,
                         email: a.patients?.email,
                         phone: a.patients?.phone,
@@ -278,80 +295,12 @@ export const getDoctorPatients = async (req, res) => {
         const doctorId = req.doctor.id
         const clinicId = req.doctor.clinic_id
 
-        const { data: appointments, error } = await supabase
-            .from('appointments')
-            .select(`
-                id, patient_id, appointment_date, appointment_time, status, notes,
-                patients (id, name, email, phone),
-                session_notes (*)
-            `)
-            .eq('doctor_id', doctorId)
-            .eq('clinic_id', clinicId)
-            .order('appointment_date', { ascending: false })
-            .order('appointment_time', { ascending: false })
-
-        if (error) throw error
-
-        // Aggregate appointments per patient (already sorted latest-first)
-        const byPatient = new Map()
-        for (const appt of appointments || []) {
-            if (!appt.patients) continue
-            let entry = byPatient.get(appt.patient_id)
-            if (!entry) {
-                const sessionNote = Array.isArray(appt.session_notes) ? appt.session_notes[0] : appt.session_notes
-                entry = {
-                    patient: {
-                        id: appt.patients.id,
-                        name: appt.patients.name,
-                        email: appt.patients.email,
-                        phone: appt.patients.phone,
-                    },
-                    total_appointments: 0,
-                    completed_sessions: 0,
-                    upcoming: 0,
-                    last_visit: {
-                        date: appt.appointment_date,
-                        time: appt.appointment_time,
-                        status: appt.status,
-                    },
-                    last_notes: sessionNote
-                        ? {
-                            notes: sessionNote.notes,
-                            diagnosis: sessionNote.diagnosis,
-                            prescription: sessionNote.prescription,
-                            follow_up_date: sessionNote.follow_up_date,
-                            tags: sessionNote.tags || [],
-                        }
-                        : null,
-                    visit_tags: [],
-                }
-                byPatient.set(appt.patient_id, entry)
-            }
-            entry.total_appointments += 1
-            if (appt.status === 'completed') entry.completed_sessions += 1
-            if (appt.status === 'confirmed') entry.upcoming += 1
-            const apptNote = Array.isArray(appt.session_notes) ? appt.session_notes[0] : appt.session_notes
-            // Latest appointment may have no notes yet — fall back to the
-            // most recent one that does
-            if (!entry.last_notes && apptNote) {
-                entry.last_notes = {
-                    notes: apptNote.notes,
-                    diagnosis: apptNote.diagnosis,
-                    prescription: apptNote.prescription,
-                    follow_up_date: apptNote.follow_up_date,
-                    tags: apptNote.tags || [],
-                }
-            }
-            // Patient summary: aggregate visit tags across all their notes
-            for (const tag of apptNote?.tags || []) {
-                if (!entry.visit_tags.includes(tag)) entry.visit_tags.push(tag)
-            }
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: [...byPatient.values()],
-        })
+        const page = Math.max(1, Math.min(100000, Number.parseInt(req.query.page, 10) || 1))
+        const pageSize = 25
+        const search = String(req.query.search || '').trim().slice(0, 100)
+        const result = await getRosterPage({ clinicId, doctorId, page, search, pageSize })
+        res.set('Cache-Control', 'no-store')
+        return res.status(200).json({ success: true, ...result })
     }
     catch (error) {
         console.error("getDoctorPatients error:", error.stack)
@@ -379,6 +328,7 @@ export const updateAppointmentStatus = async (req, res) => {
             .select('*')
             .eq('id', id)
             .eq('doctor_id', doctorId)
+            .eq('clinic_id', req.doctor.clinic_id)
             .single()
 
         if (fetchError || !appointment) {
@@ -415,6 +365,7 @@ export const updateAppointmentStatus = async (req, res) => {
 
         if (updateError) throw updateError
 
+        notifyAppointmentChange(updated, status)
         logAppointmentEvent(updated.id, appointment.clinic_id, status, {
             by: 'doctor',
         })

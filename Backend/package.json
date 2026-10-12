@@ -6,7 +6,10 @@
   "scripts": {
     "start": "nodemon index.js",
     "seed:clinic": "node scripts/seedClinic.js",
-    "seed:admin": "node scripts/seedAdmin.js"
+    "seed:admin": "node scripts/seedAdmin.js",
+    "test": "node --test tests/*.test.js",
+    "check:billing": "node scripts/checkDodoConfiguration.mjs",
+    "check:schema": "node scripts/checkDatabaseSchema.mjs"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +23,10 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "nodemon": "^3.1.14",
-    "resend": "^6.18.1"
+    "resend": "^6.18.1",
+    "socket.io": "^4.8.4"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.4"
   }
 }

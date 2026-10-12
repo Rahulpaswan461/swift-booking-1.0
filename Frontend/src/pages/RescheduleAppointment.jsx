@@ -36,6 +36,8 @@ export default function RescheduleAppointment() {
   const [selectedDate, setSelectedDate] = useState('')
   const [slots, setSlots] = useState([])
   const [slotsLoading, setSlotsLoading] = useState(false)
+  const [slotsError, setSlotsError] = useState('')
+  const [slotReload, setSlotReload] = useState(0)
   const [selectedSlot, setSelectedSlot] = useState('')
 
   const [status, setStatus] = useState('idle') // 'idle' | 'loading' | 'success' | 'error'
@@ -44,22 +46,25 @@ export default function RescheduleAppointment() {
   const days = getNextDays(14)
 
   useEffect(() => {
-    api.get(`/appointments/${id}`)
+    api.get(`/appointments/${id}`, { headers: { 'X-Appointment-Token': cancelToken } })
       .then(res => setAppointment(res.data.data))
       .catch(err => setLoadError(err.response?.data?.message || 'Failed to load appointment'))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, cancelToken])
 
   useEffect(() => {
     if (!selectedDate || !appointment) return
+    const controller = new AbortController()
     setSlotsLoading(true)
+    setSlotsError('')
     setSelectedSlot('')
     setSlots([])
-    api.get(`/doctors/${appointment.doctor_id}/slots?date=${selectedDate}`)
-      .then(res => setSlots(res.data.availableSlots || []))
-      .catch(() => setSlots([]))
-      .finally(() => setSlotsLoading(false))
-  }, [selectedDate, appointment])
+    api.get(`/doctors/${appointment.doctor_id}/slots`, {params:{date:selectedDate},signal:controller.signal})
+      .then(res => { if (!controller.signal.aborted) setSlots(res.data.availableSlots || []) })
+      .catch(err => { if (!controller.signal.aborted) setSlotsError(err.response?.data?.message || 'Could not load appointment times. Please try again.') })
+      .finally(() => { if (!controller.signal.aborted) setSlotsLoading(false) })
+    return () => controller.abort()
+  }, [selectedDate, appointment, slotReload])
 
   const handleReschedule = async () => {
     if (!selectedDate || !selectedSlot) return
@@ -74,6 +79,7 @@ export default function RescheduleAppointment() {
       setMessage(data.message || 'Appointment rescheduled successfully!')
     } catch (err) {
       setStatus('error')
+      if (err.response?.status === 409) setSlotReload(value => value + 1)
       setMessage(err.response?.data?.message || 'An error occurred while rescheduling.')
     }
   }
@@ -241,6 +247,11 @@ export default function RescheduleAppointment() {
                   <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
                 Loading available slots...
+              </div>
+            ) : slotsError ? (
+              <div role="alert" className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+                <p>{slotsError}</p>
+                <button type="button" className="mt-2 min-h-11 underline" onClick={() => setSlotReload(value => value + 1)}>Try again</button>
               </div>
             ) : slots.length === 0 ? (
               <div className="text-center py-8 text-gray-400">

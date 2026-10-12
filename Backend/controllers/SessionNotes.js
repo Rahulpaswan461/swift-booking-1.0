@@ -1,3 +1,4 @@
+import { notifyAppointmentChange } from "../realtime/server.js"
 import supabase from "../config/supabase.js"
 import { getAppointmentEvents } from "../utils/appointmentEvents.js"
 
@@ -34,7 +35,7 @@ export const createSessionNotes = async (req, res) => {
         // Verify appointment belongs to this doctor and clinic
         const { data: appointment, error: fetchError } = await supabase
             .from('appointments')
-            .select('id, doctor_id, clinic_id, status')
+            .select('id, doctor_id, clinic_id, status, appointment_date')
             .eq('id', appointment_id)
             .single()
 
@@ -97,6 +98,7 @@ export const createSessionNotes = async (req, res) => {
             })
         }
 
+        notifyAppointmentChange(appointment, 'notes_updated')
         return res.status(200).json({
             success: true,
             message: 'Session notes saved successfully',
