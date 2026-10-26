@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useClinic } from '../context/ClinicContext';
 import api from '../api/axios';
+import { readPublicPage } from '../utils/publicPageCache';
 
 const focus = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-4';
 const primary = `inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-700 ${focus}`;
@@ -41,10 +42,8 @@ export default function ClinicLanding() {
     const controller = new AbortController();
     setLoading(true);
     setError(false);
-    api.get('/doctors', { signal: controller.signal, timeout: 90_000 })
-      .then(response => {
-        const records = response.data.data || response.data;
-        if (!Array.isArray(records)) throw new Error('Invalid doctor list');
+    readPublicPage('/doctors', { get: api.get, signal: controller.signal, force: attempt > 0 })
+      .then(records => {
         if (active) setDoctors(records.filter(doctor => doctor.is_active));
       })
       .catch(err => { if (active && err.code !== 'ERR_CANCELED') setError(true); })

@@ -1,8 +1,61 @@
-import { useState } from 'react';
+import { Component, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import DemoModal from '../components/DemoModal';
 import PlatformHeader from '../components/PlatformHeader';
 import useSeo from '../hooks/useSeo'
+
+// Share the same download between idle preloading, hover/focus, and clicks.
+let demoDownload;
+function loadDemo() {
+  if (!demoDownload) {
+    demoDownload = import('../components/DemoModal').catch(error => {
+      demoDownload = null;
+      throw error;
+    });
+  }
+  return demoDownload;
+}
+const preloadDemo = () => { void loadDemo().catch(() => {}); };
+
+function DemoErrorDialog({ onClose }) {
+  const dialogRef = useRef(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog.showModal();
+    return () => dialog.close();
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="demo-loading-title"
+      onCancel={(event) => { event.preventDefault(); onClose(); }}
+      className="m-auto w-[calc(100%_-_2rem)] max-w-sm rounded-2xl border border-surface-100 bg-white p-6 text-ink-900 shadow-xl backdrop:bg-ink-900/40"
+    >
+      <h2 id="demo-loading-title" className="font-semibold text-lg">Interactive demo</h2>
+      <p role="alert" className="mt-2 text-sm text-gray-500">
+        The demo couldn’t open. You can keep browsing or reload the page to try again.
+      </p>
+      <div className="mt-5 flex flex-wrap gap-3">
+        <button type="button" onClick={onClose} className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">Close</button>
+        <button type="button" onClick={() => window.location.reload()} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-surface-50">Reload page</button>
+      </div>
+    </dialog>
+  );
+}
+
+class DemoBoundary extends Component {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    return this.state.failed
+      ? <DemoErrorDialog onClose={this.props.onClose} />
+      : this.props.children;
+  }
+}
 
 function FeatureCard({ icon, title, desc }) {
   return (
@@ -50,6 +103,44 @@ export default function HealibrateProductPage() {
 
   const navigate = useNavigate();
   const [showDemo, setShowDemo] = useState(false);
+  const [DemoModal, setDemoModal] = useState(null);
+  const [demoStatus, setDemoStatus] = useState('idle');
+  const mounted = useRef(false);
+  const demoTrigger = useRef(null);
+
+  useEffect(() => {
+    mounted.current = true;
+    // Keep the homepage's initial render independent of the demo download.
+    const idle = typeof window.requestIdleCallback === 'function';
+    const task = idle
+      ? window.requestIdleCallback(preloadDemo, { timeout: 2500 })
+      : window.setTimeout(preloadDemo, 1500);
+    return () => {
+      mounted.current = false;
+      if (idle) window.cancelIdleCallback(task);
+      else window.clearTimeout(task);
+    };
+  }, []);
+
+  const closeDemo = () => {
+    setShowDemo(false);
+    window.requestAnimationFrame(() => demoTrigger.current?.focus({ preventScroll: true }));
+  };
+
+  const openDemo = async () => {
+    if (demoStatus === 'loading') return;
+    setDemoStatus('loading');
+    try {
+      const module = await loadDemo();
+      if (!mounted.current) return;
+      setDemoModal(() => module.default);
+      setDemoStatus('idle');
+      setShowDemo(true);
+    } catch {
+      if (mounted.current) setDemoStatus('error');
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-white">
@@ -86,15 +177,27 @@ export default function HealibrateProductPage() {
               Get Started
             </button>
             <button
-              onClick={() => setShowDemo(true)}
+              ref={demoTrigger}
+              onClick={openDemo}
+              onPointerEnter={preloadDemo}
+              onFocus={preloadDemo}
+              aria-busy={demoStatus === 'loading'}
+              aria-disabled={demoStatus === 'loading'}
               className="rounded-2xl border border-gray-200 bg-white px-8 py-4 text-base font-bold text-gray-700 shadow-sm transition hover:border-brand-300 hover:bg-brand-50 flex items-center gap-2"
             >
               <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.5" />
                 <path d="M6 3V2M10 3V2M2 7h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
-              View Demo
+              {demoStatus === 'loading' ? 'Opening demo…' : 'View Demo'}
             </button>
+          </div>
+
+          <div role="status" aria-live="polite" className={demoStatus === 'error' ? 'mt-3 text-sm text-gray-600' : 'sr-only'}>
+            {demoStatus === 'error' && <>
+              The demo download was interrupted. Try again, or{' '}
+              <button type="button" className="font-semibold underline underline-offset-4" onClick={() => window.location.reload()}>reload the page</button>.
+            </>}
           </div>
 
           {/* Illustration placeholder */}
@@ -395,7 +498,11 @@ export default function HealibrateProductPage() {
       </footer>
 
       {/* Demo Modal */}
-      <DemoModal isOpen={showDemo} onClose={() => setShowDemo(false)} />
+      {showDemo && DemoModal && (
+        <DemoBoundary onClose={closeDemo}>
+          <DemoModal isOpen onClose={closeDemo} />
+        </DemoBoundary>
+      )}
     </div>
   );
 }

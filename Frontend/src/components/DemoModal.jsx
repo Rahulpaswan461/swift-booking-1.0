@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   demoWalkthroughSteps,
@@ -7,9 +7,6 @@ import {
   demoStats,
   demoClinicInfo,
   demoNotes,
-  demoTrustSignals,
-  demoTestimonials,
-  demoSecurityBadges,
 } from '../data/demoData';
 
 // ── Tiny sub-components ───────────────────────────────────────
@@ -34,7 +31,7 @@ function StarRating({ rating }) {
   );
 }
 
-function StepCard({ step, index }) {
+function StepCard({ step }) {
   const colorMap = {
     brand: 'from-brand-50 to-brand-100 border-brand-200 text-brand-700',
     green: 'from-green-50 to-green-100 border-green-200 text-green-700',
@@ -44,8 +41,7 @@ function StepCard({ step, index }) {
 
   return (
     <div
-      className={`rounded-2xl border bg-gradient-to-br p-4 ${colorMap[step.color] || colorMap.brand} animate-fade-up opacity-0`}
-      style={{ animationDelay: `${index * 80}ms`, animationFillMode: 'forwards' }}
+      className={`rounded-2xl border bg-gradient-to-br p-4 ${colorMap[step.color] || colorMap.brand}`}
     >
       <div className="text-2xl mb-2">{step.icon}</div>
       <h4 className="font-semibold text-sm mb-1">{step.title}</h4>
@@ -154,7 +150,7 @@ function WalkthroughSection({ onTryDemo }) {
   const navigate = useNavigate();
 
   return (
-    <div className="animate-fade-in">
+    <div>
       {/* Hero */}
       <div className="text-center mb-5">
         <div className="inline-flex items-center gap-2 rounded-full bg-brand-50 border border-brand-200 px-3 py-1 text-xs font-semibold text-brand-700 mb-3">
@@ -172,7 +168,7 @@ function WalkthroughSection({ onTryDemo }) {
       {/* Feature cards */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         {demoWalkthroughSteps.map((step, i) => (
-          <StepCard key={i} step={step} index={i} />
+          <StepCard key={i} step={step} />
         ))}
       </div>
 
@@ -212,51 +208,12 @@ function WalkthroughSection({ onTryDemo }) {
         </div>
       </div>
 
-      {/* Trust bar */}
-      <div className="rounded-2xl border border-gray-100 bg-surface-50 p-4 mb-5">
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <div>
-            <p className="text-base font-bold text-ink-900">{demoTrustSignals.clinicsOnboard}</p>
-            <p className="text-[9px] text-gray-400">Clinics Trust Us</p>
-          </div>
-          <div>
-            <p className="text-base font-bold text-ink-900">{demoTrustSignals.monthlyBookings}</p>
-            <p className="text-[9px] text-gray-400">Bookings/Month</p>
-          </div>
-          <div>
-            <p className="text-base font-bold text-ink-900">{demoTrustSignals.uptime}</p>
-            <p className="text-[9px] text-gray-400">Uptime</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Testimonial */}
-      <div className="rounded-2xl border border-gray-100 bg-white p-4 mb-5">
-        <div className="flex items-start gap-2 mb-2">
-          <StarRating rating={demoTrustSignals.avgRating} />
-        </div>
-        <p className="text-xs text-gray-600 italic leading-relaxed mb-2">
-          &ldquo;{demoTestimonials[0].text}&rdquo;
+      <div className="rounded-2xl border border-brand-100 bg-brand-50 p-4 mb-5">
+        <h4 className="text-sm font-semibold text-ink-900">Explore with sample data</h4>
+        <p className="mt-1 text-xs leading-relaxed text-gray-600">
+          Try patient booking, then switch to the clinic and doctor views.
+          All names and figures here are examples. No real appointment is created.
         </p>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-brand-100 flex items-center justify-center text-[9px] font-bold text-brand-700">
-            RK
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold text-ink-900">{demoTestimonials[0].name}</p>
-            <p className="text-[9px] text-gray-400">{demoTestimonials[0].clinic}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Security badges */}
-      <div className="flex items-center justify-center gap-4 mb-5">
-        {demoSecurityBadges.map((badge) => (
-          <div key={badge.label} className="flex items-center gap-1 text-[9px] text-gray-400">
-            <span>{badge.icon}</span>
-            <span>{badge.label}</span>
-          </div>
-        ))}
       </div>
 
       {/* CTA buttons */}
@@ -827,6 +784,7 @@ function DoctorDemo() {
 // ── Main Modal ───────────────────────────────────────────────
 
 export default function DemoModal({ isOpen, onClose }) {
+  const dialogRef = useRef(null);
   const [showDemo, setShowDemo] = useState(false);
   const [activeTab, setActiveTab] = useState('patient'); // patient | admin | doctor
 
@@ -838,24 +796,36 @@ export default function DemoModal({ isOpen, onClose }) {
     }
   }, [isOpen]);
 
-  // Close on Escape key
+  // A native dialog keeps keyboard focus inside and restores it on close.
   useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') onClose();
+    if (!isOpen) return;
+    const dialog = dialogRef.current;
+    const { overflow, paddingRight } = document.body.style;
+    const scrollbar = window.innerWidth - document.documentElement.clientWidth;
+    const bodyPadding = parseFloat(window.getComputedStyle(document.body).paddingRight) || 0;
+    document.body.style.overflow = 'hidden';
+    if (scrollbar > 0) document.body.style.paddingRight = `${bodyPadding + scrollbar}px`;
+    dialog.showModal();
+    return () => {
+      dialog.close();
+      document.body.style.overflow = overflow;
+      document.body.style.paddingRight = paddingRight;
     };
-    if (isOpen) window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="interactive-demo-title"
+      onCancel={event => { event.preventDefault(); onClose(); }}
+      onClick={event => { if (event.target === event.currentTarget) onClose(); }}
+      className="fixed inset-0 m-0 h-[100dvh] max-h-none w-full max-w-none items-center justify-center bg-transparent p-0 open:flex backdrop:bg-black/50 backdrop:backdrop-blur-sm"
+    >
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg mx-4 bg-white rounded-3xl shadow-2xl shadow-black/20 overflow-hidden animate-scale-in max-h-[90vh] flex flex-col">
+      <div className="relative w-full max-w-lg mx-4 bg-white rounded-3xl shadow-2xl shadow-black/20 overflow-hidden motion-safe:animate-scale-in max-h-[90dvh] flex flex-col">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -865,7 +835,7 @@ export default function DemoModal({ isOpen, onClose }) {
               </svg>
             </div>
             <div>
-              <h3 className="font-semibold text-sm text-ink-900">
+              <h3 id="interactive-demo-title" className="font-semibold text-sm text-ink-900">
                 {showDemo ? 'Interactive Demo' : 'Healibrate Demo'}
               </h3>
               <p className="text-[10px] text-gray-400">
@@ -939,16 +909,23 @@ export default function DemoModal({ isOpen, onClose }) {
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
             Demo data — nothing is saved
           </p>
-          {showDemo && (
+          {showDemo ? (
             <button
               onClick={() => setShowDemo(false)}
-              className="text-[10px] font-semibold text-brand-600 hover:text-brand-700 transition"
+              className="text-xs font-semibold text-brand-600 hover:text-brand-700 transition"
             >
               ← Overview
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowDemo(true)}
+              className="rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
+            >
+              Start demo →
             </button>
           )}
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

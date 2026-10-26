@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { invalidatePublicPageCache, isPublicPageMutation } from '../utils/publicPageCache'
 
 // In dev: empty string → proxy handles it via vite.config.js
 
@@ -42,7 +43,10 @@ adminApi.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
-adminApi.interceptors.response.use(res => res, err => {
+adminApi.interceptors.response.use(res => {
+  if (isPublicPageMutation(res.config)) invalidatePublicPageCache()
+  return res
+}, err => {
   const isLoginRoute = err.config?.url?.includes('/admin/login') || err.config?.url?.includes('/admin/clinics')
   if (err.response?.status === 401 && !isLoginRoute) {
     localStorage.removeItem('admin_token')

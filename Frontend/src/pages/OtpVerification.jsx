@@ -72,16 +72,7 @@ export default function OtpVerification() {
       // Save patient token AND patient_id using the new context method
       savePatient(res.data.token, res.data.patient_id, contactValue, contactType, res.data.clinic_id)
 
-      // Fetch clinic info for branding
-      try {
-        const clinicRes = await api.get('/clinic/info')
-        if (clinicRes.data.data) {
-          localStorage.setItem('clinic_info', JSON.stringify(clinicRes.data.data))
-        }
-      } catch (clinicErr) {
-        // Non-critical — clinic info is optional
-        console.warn('Failed to fetch clinic info:', clinicErr)
-      }
+      // ClinicProvider already owns public branding; do not repeat its read here.
 
       const selectedDoctor = state?.doctor
       navigate(selectedDoctor?.id ? `/book/${selectedDoctor.id}` : '/doctors', { state: selectedDoctor ? { doctor: selectedDoctor } : null })

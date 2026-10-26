@@ -5,7 +5,7 @@
 // indexed by search engines, so this check is what the robots policy and the
 // homepage fallback both key off.
 
-const BASE = (import.meta.env.VITE_APP_BASE_DOMAIN || 'healibrate.com')
+const BASE = (import.meta.env?.VITE_APP_BASE_DOMAIN || 'healibrate.com')
   .split(':')[0]
   .toLowerCase()
 
@@ -17,8 +17,8 @@ const BASE = (import.meta.env.VITE_APP_BASE_DOMAIN || 'healibrate.com')
  * direction hides one clinic page; getting it wrong the other way would
  * de-index the marketing site.
  */
-export function isPlatformHost() {
-  if (typeof window === 'undefined') return true
-  const host = window.location.hostname.toLowerCase()
-  return host === BASE || host === `www.${BASE}` || host === 'localhost'
+export function isPlatformHost(hostname = typeof window === 'undefined' ? BASE : window.location.hostname) {
+  const host = hostname.toLowerCase()
+  return host === BASE || host === `www.${BASE}` ||
+    host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1'
 }

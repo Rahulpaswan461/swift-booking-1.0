@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom'
+import { useClinic } from '../context/ClinicContext'
 
 export default function Logo({ size = 'md', showClinicName = false }) {
   const sizes = { sm: 'text-lg', md: 'text-2xl', lg: 'text-3xl' }
-  const clinicInfo = JSON.parse(localStorage.getItem('clinic_info') || 'null')
+  const clinicInfo = useClinic()?.clinic
   const branding = clinicInfo?.branding
   const clinicName = branding?.clinic_name || clinicInfo?.name
   const logoUrl = branding?.logo_url

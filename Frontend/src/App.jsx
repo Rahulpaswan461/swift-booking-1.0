@@ -15,6 +15,7 @@ import PlatformMetrics from './pages/internal/PlatformMetrics'
 // Landing page (shown when a tenant is resolved)
 import ClinicLanding from './pages/ClinicLanding'
 import ClinicNotFound from './pages/ClinicNotFound'
+import ClinicUnavailable from './pages/ClinicUnavailable'
 
 // Patient pages
 import EmailVerification   from './pages/EmailVerification'
@@ -63,29 +64,29 @@ function AdminRoute({ children }) {
 // When no tenant → show the Healibrate product page (for clinic owners)
 
 function ConditionalHome() {
-  const { hasTenant, loading } = useClinic();
+  const { hasTenant, loading, error, retryClinic } = useClinic();
+
+  // The platform homepage is static content: never wait for the clinic API.
+  if (isPlatformHost()) return <HealibrateProductPage />;
 
   if (loading) {
     return (
       <div className="min-h-screen bg-surface-50 flex items-center justify-center">
-        <div className="flex items-center gap-2 text-gray-400 text-sm">
+        <div className="flex items-center gap-2 text-gray-500 text-sm" role="status">
           <svg className="animate-spin" width="16" height="16" viewBox="0 0 16 16" fill="none">
             <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" />
             <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
-          Loading...
+          Opening the clinic booking page…
         </div>
       </div>
     );
   }
 
+  if (error === 'unavailable') return <ClinicUnavailable onRetry={retryClinic} />;
   if (hasTenant) return <ClinicLanding />;
 
-  // No clinic resolved. On the platform host that's the marketing homepage;
-  // on a clinic subdomain it means the slug doesn't exist, and serving the
-  // marketing site there would hand crawlers a duplicate homepage on every
-  // made-up subdomain.
-  return isPlatformHost() ? <HealibrateProductPage /> : <ClinicNotFound />;
+  return <ClinicNotFound />;
 }
 
 export default function App() {

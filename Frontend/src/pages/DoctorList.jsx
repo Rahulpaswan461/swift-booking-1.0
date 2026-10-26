@@ -4,6 +4,7 @@ import api from '../api/axios'
 import Logo from '../components/Logo'
 import StepIndicator from '../components/StepIndicator'
 import { useClinic } from '../context/ClinicContext'
+import { readPublicPage } from '../utils/publicPageCache'
 
 function initialsOf(name) {
   return (name || 'D')
@@ -110,10 +111,8 @@ export default function DoctorList() {
     const controller = new AbortController()
     setLoading(true)
     setLoadError(false)
-    api.get('/doctors', { signal: controller.signal, timeout: 30_000 })
-      .then(res => {
-        const records = res.data.data || res.data
-        if (!Array.isArray(records)) throw new Error('Invalid doctor response')
+    readPublicPage('/doctors', { get: api.get, signal: controller.signal, force: attempt > 0 })
+      .then(records => {
         if (!controller.signal.aborted) setDoctors(records)
       })
       .catch(() => { if (!controller.signal.aborted) setLoadError(true) })
