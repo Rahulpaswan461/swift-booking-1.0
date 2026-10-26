@@ -1,0 +1,5 @@
+
+# Private clinic outreach files
+.clinic-outreach/
+clinic-emails.txt
+clinic-unsubscribed.txt
