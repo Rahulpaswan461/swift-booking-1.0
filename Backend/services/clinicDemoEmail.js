@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 
 export const VIDEO_URL = 'https://s3.ap-south-1.amazonaws.com/healibrate.com/Healibrate-Walkthrough.mp4'
-export const SUBJECT = 'A quick question about appointments at your clinic'
+export const SUBJECT = 'Online appointment booking for your clinic'
 const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 
 export function normalizeEmails(input) {
@@ -12,7 +12,7 @@ export function normalizeEmails(input) {
   return [...new Set(emails.map(email => email.toLowerCase()))]
 }
 
-export function buildClinicDemoEmail({ clientEmail, clinicName = '', websiteReviewed = false }) {
+export function buildClinicDemoEmail({ clientEmail, clinicName = '', websiteReviewed = true }) {
   const [to] = normalizeEmails([clientEmail])
   if (!to) throw new Error('clientEmail is required')
   const greeting = clinicName ? `Hi ${clinicName} team,` : 'Hi Doctor,'
@@ -20,19 +20,21 @@ export function buildClinicDemoEmail({ clientEmail, clinicName = '', websiteRevi
   const observation = websiteReviewed === true
     ? "I came across your clinic's website and noticed that I couldn't find an option for patients to book appointments online."
     : "I'm reaching out to introduce a tool I've built for clinics."
-  const paragraphs = [greeting, "I'm Rahul, founder of Healibrate.", observation,
-    "I’ve built Healibrate, a platform that helps clinics offer online booking and manage appointments and doctor availability in one place.",
-    "I’ve also created a short demo showing how it works."]
-  const text = paragraphs.join('\n\n') + `\n\nWatch demo: ${VIDEO_URL}\nWebsite: https://healibrate.com\n\nWould you be open to taking a look and sharing your thoughts?\n\nBest regards,\nRahul\nFounder, Healibrate\nPhone: 8595946123\n\nIf this isn't relevant to your clinic, reply with “unsubscribe” and I won't send further product emails.`
+  const paragraphs = [greeting, "I'm Rahul, founder of Healibrate.",
+    ...(websiteReviewed === true ? [observation] : []),
+    "I've built a tool that lets patients book appointments online and helps clinic staff manage appointments and doctors' availability in one place.",
+    "It can sit alongside the phone calls and WhatsApp messages your clinic already uses."]
+  const question = "Would this be useful for your clinic? I'd appreciate your honest feedback."
+  const optOut = "If you'd prefer not to receive another email from me, just reply and let me know."
+  const text = paragraphs.join('\n\n') + `\n\nHere's a short demo of how it works: ${VIDEO_URL}\n\n${question}\n\nBest regards,\nRahul\nFounder, Healibrate\n8595946123\n\n${optOut}`
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>A note from Rahul at Healibrate</title></head>
 <body style="margin:0;background:#ffffff;color:#263b35;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.65">
 <div style="max-width:600px;padding:24px 20px">
 ${paragraphs.map(p => `<p style="margin:0 0 18px">${escapeHtml(p)}</p>`).join('')}
-<p style="margin:0 0 20px"><strong>Watch demo:</strong> <a href="${VIDEO_URL}" style="color:#1d7f72">Healibrate product walkthrough</a><br>
-<strong>Website:</strong> <a href="https://healibrate.com" style="color:#1d7f72">https://healibrate.com</a></p>
-<p style="margin:0 0 22px">Would you be open to taking a look and sharing your thoughts?</p>
-<p style="margin:0">Best regards,<br>Rahul<br>Founder, Healibrate<br>Phone: <a href="tel:+918595946123" style="color:#263b35;text-decoration:none">8595946123</a></p>
-<p style="margin:28px 0 0;font-size:12px;line-height:1.6;color:#66766f">If this isn't relevant to your clinic, reply with “unsubscribe” and I won't send further product emails.</p>
+<p style="margin:0 0 18px">Here's a short <a href="${VIDEO_URL}" style="color:#1d7f72">demo of how it works</a>.</p>
+<p style="margin:0 0 18px">${escapeHtml(question)}</p>
+<p style="margin:0 0 18px">Best regards,<br>Rahul<br>Founder, Healibrate<br>8595946123</p>
+<p style="margin:0">${escapeHtml(optOut)}</p>
 </div></body></html>`
   return { from: 'Healibrate <noreply@send.healibrate.com>', to, subject: SUBJECT, html, text, replyTo: 'support@healibrate.com',
     headers: { 'List-Unsubscribe': '<mailto:support@healibrate.com?subject=Unsubscribe%20from%20Healibrate>' } }
@@ -45,7 +47,7 @@ export function demoSendKey(email, campaignId) {
 
 /** Send one promotional demo email. Inject a Resend instance when reusing this in the backend. */
 export async function sendClinicDemoEmail({ clientEmail, clinicName, websiteReviewed = false, campaignId = 'healibrate-demo-v1', resend }) {
-  const payload = buildClinicDemoEmail({ clientEmail, clinicName, websiteReviewed })
+  const payload = buildClinicDemoEmail({ clientEmail, clinicName, websiteReviewed:true })
   const idempotencyKey = demoSendKey(payload.to, campaignId)
   if (!resend) {
     if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is missing')

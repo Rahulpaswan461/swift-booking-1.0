@@ -66,5 +66,13 @@ test('bulk sending passes the website-review choice into each individual message
   await sendClinicDemoEmails({ emails: ['general@example.com'], resend })
   assert.ok(payloads[0].text.includes("I came across your clinic's website"))
   assert.ok(!payloads[1].text.includes('came across'))
-  assert.equal(payloads[0].subject, 'A quick question about appointments at your clinic')
+  assert.equal(payloads[0].subject, 'Online appointment booking for your clinic')
 })
+
+ test('different test campaigns issue distinct send keys, while retries stay stable', async () => {
+  const keys = []
+  const resend = { emails: { send: async (payload, options) => { keys.push(options.idempotencyKey); return { data: { id: 'mock-id' } } } } }
+  for (const campaignId of ['test-first', 'test-first', 'test-second']) await sendClinicDemoEmail({ clientEmail: 'own@example.com', campaignId, resend })
+  assert.equal(keys[0], keys[1])
+  assert.notEqual(keys[0], keys[2])
+ })

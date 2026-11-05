@@ -102,6 +102,18 @@ export default function HealibrateProductPage() {
   })
 
   const navigate = useNavigate();
+  const [videoStarted, setVideoStarted] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const videoRef = useRef(null);
+  const videoStartAt = useRef(0);
+  const playVideoAt = (seconds) => {
+    videoStartAt.current = seconds;
+    setVideoStarted(true);
+    if (videoRef.current?.readyState >= 1) {
+      videoRef.current.currentTime = seconds;
+      void videoRef.current.play().catch(() => {});
+    }
+  };
   const [showDemo, setShowDemo] = useState(false);
   const [DemoModal, setDemoModal] = useState(null);
   const [demoStatus, setDemoStatus] = useState('idle');
@@ -200,41 +212,50 @@ export default function HealibrateProductPage() {
             </>}
           </div>
 
-          {/* Illustration placeholder */}
-          <div className="mt-16 mx-auto max-w-5xl">
-            <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 p-2 shadow-2xl">
-              <div className="rounded-xl bg-white p-6 grid grid-cols-3 gap-4">
-                {/* Clinic Dashboard mockup */}
-                <div className="rounded-lg border border-gray-100 p-4 bg-gradient-to-br from-brand-50 to-white">
-                  <div className="text-xs font-semibold text-brand-600 uppercase tracking-wider mb-3">Clinic Dashboard</div>
-                  <div className="space-y-2">
-                    <div className="h-3 bg-brand-100 rounded w-3/4"></div>
-                    <div className="h-3 bg-brand-50 rounded w-1/2"></div>
-                    <div className="h-8 bg-brand-100 rounded mt-3"></div>
-                    <div className="h-3 bg-brand-50 rounded w-2/3"></div>
-                  </div>
-                </div>
-                {/* Doctor Dashboard mockup */}
-                <div className="rounded-lg border border-gray-100 p-4 bg-gradient-to-br from-green-50 to-white">
-                  <div className="text-xs font-semibold text-green-600 uppercase tracking-wider mb-3">Doctor Portal</div>
-                  <div className="space-y-2">
-                    <div className="h-3 bg-green-100 rounded w-3/4"></div>
-                    <div className="h-3 bg-green-50 rounded w-1/2"></div>
-                    <div className="h-8 bg-green-100 rounded mt-3"></div>
-                    <div className="h-3 bg-green-50 rounded w-2/3"></div>
-                  </div>
-                </div>
-                {/* Patient Booking Portal mockup */}
-                <div className="rounded-lg border border-gray-100 p-4 bg-gradient-to-br from-amber-50 to-white">
-                  <div className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-3">Patient Portal</div>
-                  <div className="space-y-2">
-                    <div className="h-3 bg-amber-100 rounded w-3/4"></div>
-                    <div className="h-3 bg-amber-50 rounded w-1/2"></div>
-                    <div className="h-8 bg-amber-100 rounded mt-3"></div>
-                    <div className="h-3 bg-amber-50 rounded w-2/3"></div>
-                  </div>
-                </div>
+          <div className="mt-12 sm:mt-16 mx-auto max-w-5xl text-left" id="product-video">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
+              <div>
+                <h2 className="font-display text-2xl sm:text-3xl font-semibold text-ink-900">See how Healibrate works.</h2>
+                <p className="mt-2 text-base text-ink-900">Follow one appointment—from the patient’s booking to your team’s schedule.</p>
               </div>
+              <p className="shrink-0 text-sm text-gray-600">86 seconds · Captioned walkthrough</p>
+            </div>
+            <div className="aspect-video overflow-hidden rounded-2xl bg-surface-50">
+              {videoStarted ? (
+                <video
+                  ref={videoRef}
+                  onLoadedMetadata={() => { videoRef.current.currentTime = videoStartAt.current; }}
+                  className="h-full w-full" controls autoPlay playsInline preload="none"
+                  poster="/media/healibrate-launch-poster.webp"
+                  aria-label="Healibrate product walkthrough: booking, appointments and doctor availability"
+                  onError={() => setVideoFailed(true)}
+                  src="/media/healibrate-owner-demo.mp4"
+                />
+              ) : (
+                <button type="button" onClick={() => playVideoAt(0)}
+                  className="group relative block h-full w-full focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-brand-600"
+                  aria-label="Play the 86-second Healibrate walkthrough">
+                  <img src="/media/healibrate-launch-poster.webp" alt="Healibrate clinic appointment view with fictional demo data" width="1280" height="720" className="h-full w-full object-cover" />
+                  <span className="absolute inset-x-0 bottom-5 sm:bottom-8 flex justify-center">
+                    <span className="inline-flex items-center gap-3 rounded-full bg-brand-700 px-6 py-3 sm:px-8 sm:py-4 text-base font-semibold text-white transition-transform motion-safe:group-hover:scale-105">
+                      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M6 3l11 7-11 7V3z" /></svg>
+                      Watch Healibrate in action
+                    </span>
+                  </span>
+                </button>
+              )}
+            </div>
+            <nav aria-label="Video chapters" className="mt-4 flex flex-wrap gap-2">
+              {[{label: 'Patient books online', time: 20.5}, {label: 'Your clinic manages the day', time: 37.5}, {label: 'A patient changes their time', time: 52.5}].map(chapter => (
+                <button key={chapter.time} type="button" onClick={() => playVideoAt(chapter.time)} className="min-h-11 rounded-full bg-surface-50 px-4 py-2 text-sm font-medium text-ink-900 hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600">
+                  {chapter.label} <span className="ml-1 text-gray-600">{Math.floor(chapter.time / 60)}:{String(Math.floor(chapter.time % 60)).padStart(2, '0')}</span>
+                </button>
+              ))}
+            </nav>
+            {videoFailed && <p role="alert" className="mt-3 text-sm text-ink-900">The video couldn’t load. <a className="underline" href="/media/healibrate-owner-demo.mp4" target="_blank" rel="noreferrer">Open the video directly</a>, or try the interactive demo above.</p>}
+            <div className="mt-4 flex flex-col sm:flex-row justify-between gap-2 text-sm text-gray-600">
+              <p>Patient booking · Appointment management · Doctor availability</p>
+              <p>Actual product. Fictional clinic and patient details.</p>
             </div>
           </div>
         </div>

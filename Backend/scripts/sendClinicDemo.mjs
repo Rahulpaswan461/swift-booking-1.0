@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { readFile, writeFile, mkdir, appendFile, open, unlink } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -10,13 +11,16 @@ dotenv.config({ path: resolve(backend, '.env'), quiet: true })
 const { values } = parseArgs({ options: {
   file: { type: 'string' }, campaign: { type: 'string', default: 'healibrate-demo-v1' },
   'website-reviewed': { type: 'boolean', default: false },
+  test: { type: 'boolean', default: false },
   send: { type: 'boolean', default: false }, help: { type: 'boolean', default: false },
 } })
 if (values.help || !values.file) {
-  console.log('Preview: node scripts/sendClinicDemo.mjs --file clinic-emails.txt\nSend:    node scripts/sendClinicDemo.mjs --file clinic-emails.txt --send\nOptional: --campaign healibrate-demo-v1\n--website-reviewed: include the website observation only when you have checked every clinic in the list\nOne address per line (commas also accepted). No emails are sent without --send.')
+  console.log('Preview: node scripts/sendClinicDemo.mjs --file clinic-emails.txt\nSend:    node scripts/sendClinicDemo.mjs --file clinic-emails.txt --send\nOptional: --campaign healibrate-demo-v1\nTest: --test uses a fresh campaign for ONE recipient; add --send to send\n--website-reviewed: include the website observation only when you have checked every clinic in the list\nOne address per line (commas also accepted). No emails are sent without --send.')
   process.exit(values.help ? 0 : 1)
 }
 
+// A fresh campaign bypasses prior test acceptance without disabling suppression.
+if (values.test) values.campaign = `test-${randomUUID()}`
 const out = resolve(backend, '.clinic-outreach')
 const journalPath = resolve(out, `${values.campaign}.jsonl`)
 const lockPath = resolve(out, `${values.campaign}.lock`)
@@ -26,6 +30,8 @@ const readOptional = async path => { try { return await readFile(path, 'utf8') }
 async function run() {
   const emails = normalizeEmails(await readFile(resolve(values.file), 'utf8'))
   if (!emails.length) throw new Error('The recipient file is empty')
+  if (values.test && emails.length !== 1) throw new Error('--test requires exactly one recipient. Use a file containing only your own test address.')
+  console.log(`Campaign: ${values.campaign}${values.test ? ' (single-recipient test)' : ''}`)
   const suppressed = normalizeEmails(await readOptional(resolve(backend, 'clinic-unsubscribed.txt')))
   await mkdir(out, { recursive: true, mode: 0o700 })
   const payload = buildClinicDemoEmail({ clientEmail: emails[0], websiteReviewed: values['website-reviewed'] })
@@ -50,7 +56,8 @@ async function run() {
     await writeFile(resolve(out, `${values.campaign}-report.json`), JSON.stringify(results, null, 2), { mode: 0o600 })
     for (const result of results.filter(r => r.status === 'failed')) console.error(`Failed: ${result.email} — ${result.error}`)
     console.log(['accepted', 'skipped', 'failed'].map(s => `${s}: ${results.filter(r => r.status === s).length}`).join(' | '))
-    console.log('Accepted means Resend queued the email; check Resend for delivery/bounce status.')
+    console.log('Accepted means Resend accepted the request, not confirmed delivery. Reused campaign keys may return a previous email ID. Check Resend for delivery/bounce status.')
+    if (results.some(r => r.status === 'skipped')) console.log('Skipped recipients were previously accepted for this campaign or are unsubscribed. For your own test address, use --test with a one-address file.')
     if (results.some(r => r.status === 'failed')) process.exitCode = 1
   } finally { await lock.close(); await unlink(lockPath) }
 }
