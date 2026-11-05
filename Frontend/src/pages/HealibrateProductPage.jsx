@@ -212,13 +212,55 @@ export default function HealibrateProductPage() {
             </>}
           </div>
 
-          <div className="mt-12 sm:mt-16 mx-auto max-w-5xl text-left" id="product-video">
+          {/* Platform overview */}
+          <div className="mt-16 mx-auto max-w-5xl">
+            <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-gray-100 p-2 shadow-2xl">
+              <div className="rounded-xl bg-white p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Clinic Dashboard mockup */}
+                <div className="rounded-lg border border-gray-100 p-4 bg-gradient-to-br from-brand-50 to-white">
+                  <div className="text-xs font-semibold text-brand-600 uppercase tracking-wider mb-3">Clinic Dashboard</div>
+                  <div className="space-y-2">
+                    <div className="h-3 bg-brand-100 rounded w-3/4"></div>
+                    <div className="h-3 bg-brand-50 rounded w-1/2"></div>
+                    <div className="h-8 bg-brand-100 rounded mt-3"></div>
+                    <div className="h-3 bg-brand-50 rounded w-2/3"></div>
+                  </div>
+                </div>
+                {/* Doctor Dashboard mockup */}
+                <div className="rounded-lg border border-gray-100 p-4 bg-gradient-to-br from-green-50 to-white">
+                  <div className="text-xs font-semibold text-green-600 uppercase tracking-wider mb-3">Doctor Portal</div>
+                  <div className="space-y-2">
+                    <div className="h-3 bg-green-100 rounded w-3/4"></div>
+                    <div className="h-3 bg-green-50 rounded w-1/2"></div>
+                    <div className="h-8 bg-green-100 rounded mt-3"></div>
+                    <div className="h-3 bg-green-50 rounded w-2/3"></div>
+                  </div>
+                </div>
+                {/* Patient Booking Portal mockup */}
+                <div className="rounded-lg border border-gray-100 p-4 bg-gradient-to-br from-amber-50 to-white">
+                  <div className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-3">Patient Portal</div>
+                  <div className="space-y-2">
+                    <div className="h-3 bg-amber-100 rounded w-3/4"></div>
+                    <div className="h-3 bg-amber-50 rounded w-1/2"></div>
+                    <div className="h-8 bg-amber-100 rounded mt-3"></div>
+                    <div className="h-3 bg-amber-50 rounded w-2/3"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Product demo — added alongside the original homepage sections */}
+      <section id="product-video" aria-labelledby="product-video-title" className="scroll-mt-24 bg-surface-50 px-5 sm:px-8 py-12 sm:py-16">
+          <div className="mx-auto max-w-5xl text-left">
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
               <div>
-                <h2 className="font-display text-2xl sm:text-3xl font-semibold text-ink-900">See how Healibrate works.</h2>
-                <p className="mt-2 text-base text-ink-900">Follow one appointment—from the patient’s booking to your team’s schedule.</p>
+                <h2 id="product-video-title" className="font-display text-2xl sm:text-3xl font-semibold text-ink-900">Watch the Healibrate demo</h2>
+                <p className="mt-2 text-base text-ink-900">See how patients book online and how your clinic manages appointments, doctor availability and changes.</p>
               </div>
-              <p className="shrink-0 text-sm text-gray-600">86 seconds · Captioned walkthrough</p>
+              <p className="shrink-0 text-sm text-gray-600">86 seconds · Captions included</p>
             </div>
             <div className="aspect-video overflow-hidden rounded-2xl bg-surface-50">
               {videoStarted ? (
@@ -226,7 +268,7 @@ export default function HealibrateProductPage() {
                   ref={videoRef}
                   onLoadedMetadata={() => { videoRef.current.currentTime = videoStartAt.current; }}
                   className="h-full w-full" controls autoPlay playsInline preload="none"
-                  poster="/media/healibrate-launch-poster.webp"
+                  poster="/media/healibrate-demo-cover.webp"
                   aria-label="Healibrate product walkthrough: booking, appointments and doctor availability"
                   onError={() => setVideoFailed(true)}
                   src="/media/healibrate-owner-demo.mp4"
@@ -235,13 +277,18 @@ export default function HealibrateProductPage() {
                 <button type="button" onClick={() => playVideoAt(0)}
                   className="group relative block h-full w-full focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-brand-600"
                   aria-label="Play the 86-second Healibrate walkthrough">
-                  <img src="/media/healibrate-launch-poster.webp" alt="Healibrate clinic appointment view with fictional demo data" width="1280" height="720" className="h-full w-full object-cover" />
-                  <span className="absolute inset-x-0 bottom-5 sm:bottom-8 flex justify-center">
-                    <span className="inline-flex items-center gap-3 rounded-full bg-brand-700 px-6 py-3 sm:px-8 sm:py-4 text-base font-semibold text-white transition-transform motion-safe:group-hover:scale-105">
-                      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M6 3l11 7-11 7V3z" /></svg>
-                      Watch Healibrate in action
+                  <img src="/media/healibrate-demo-cover.webp" alt="Healibrate clinic appointment view with fictional demo data" width="1280" height="720" className="h-full w-full object-cover" />
+                  <span className="absolute inset-0 bg-ink-900/65" aria-hidden="true" />
+                  <span className="absolute left-5 right-5 top-4 sm:left-10 sm:right-10 sm:top-8 text-left text-white">
+                    <span className="block text-base sm:text-xl font-medium">Healibrate product demo</span>
+                    <span className="mt-1 sm:mt-3 block text-xl sm:text-4xl font-semibold leading-tight">Patients book online.<br />Your clinic stays organized.</span>
+                  </span>
+                  <span className="absolute inset-0 flex items-center justify-center pt-10 sm:pt-8">
+                    <span className="flex h-14 w-14 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-white text-brand-700 transition-transform motion-safe:group-hover:scale-105">
+                      <svg aria-hidden="true" width="28" height="28" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3l10 7-10 7V3z" /></svg>
                     </span>
                   </span>
+                  <span className="absolute bottom-3 right-3 sm:bottom-6 sm:right-6 rounded bg-ink-900 px-2 py-1 text-sm font-semibold text-white">1:26</span>
                 </button>
               )}
             </div>
@@ -258,7 +305,6 @@ export default function HealibrateProductPage() {
               <p>Actual product. Fictional clinic and patient details.</p>
             </div>
           </div>
-        </div>
       </section>
 
       {/* How It Works */}
