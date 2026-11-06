@@ -104,16 +104,6 @@ export default function HealibrateProductPage() {
   const navigate = useNavigate();
   const [videoStarted, setVideoStarted] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
-  const videoRef = useRef(null);
-  const videoStartAt = useRef(0);
-  const playVideoAt = (seconds) => {
-    videoStartAt.current = seconds;
-    setVideoStarted(true);
-    if (videoRef.current?.readyState >= 1) {
-      videoRef.current.currentTime = seconds;
-      void videoRef.current.play().catch(() => {});
-    }
-  };
   const [showDemo, setShowDemo] = useState(false);
   const [DemoModal, setDemoModal] = useState(null);
   const [demoStatus, setDemoStatus] = useState('idle');
@@ -265,8 +255,6 @@ export default function HealibrateProductPage() {
             <div className="aspect-video overflow-hidden rounded-2xl bg-surface-50">
               {videoStarted ? (
                 <video
-                  ref={videoRef}
-                  onLoadedMetadata={() => { videoRef.current.currentTime = videoStartAt.current; }}
                   className="h-full w-full" controls autoPlay playsInline preload="none"
                   poster="/media/healibrate-demo-cover.webp"
                   aria-label="Healibrate product walkthrough: booking, appointments and doctor availability"
@@ -274,7 +262,7 @@ export default function HealibrateProductPage() {
                   src="/media/healibrate-owner-demo.mp4"
                 />
               ) : (
-                <button type="button" onClick={() => playVideoAt(0)}
+                <button type="button" onClick={() => setVideoStarted(true)}
                   className="group relative block h-full w-full focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-brand-600"
                   aria-label="Play the 86-second Healibrate walkthrough">
                   <img src="/media/healibrate-demo-cover.webp" alt="Healibrate clinic appointment view with fictional demo data" width="1280" height="720" className="h-full w-full object-cover" />
@@ -292,18 +280,8 @@ export default function HealibrateProductPage() {
                 </button>
               )}
             </div>
-            <nav aria-label="Video chapters" className="mt-4 flex flex-wrap gap-2">
-              {[{label: 'Patient books online', time: 20.5}, {label: 'Your clinic manages the day', time: 37.5}, {label: 'A patient changes their time', time: 52.5}].map(chapter => (
-                <button key={chapter.time} type="button" onClick={() => playVideoAt(chapter.time)} className="min-h-11 rounded-full bg-surface-50 px-4 py-2 text-sm font-medium text-ink-900 hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600">
-                  {chapter.label} <span className="ml-1 text-gray-600">{Math.floor(chapter.time / 60)}:{String(Math.floor(chapter.time % 60)).padStart(2, '0')}</span>
-                </button>
-              ))}
-            </nav>
             {videoFailed && <p role="alert" className="mt-3 text-sm text-ink-900">The video couldn’t load. <a className="underline" href="/media/healibrate-owner-demo.mp4" target="_blank" rel="noreferrer">Open the video directly</a>, or try the interactive demo above.</p>}
-            <div className="mt-4 flex flex-col sm:flex-row justify-between gap-2 text-sm text-gray-600">
-              <p>Patient booking · Appointment management · Doctor availability</p>
-              <p>Actual product. Fictional clinic and patient details.</p>
-            </div>
+            <p className="mt-3 text-sm text-gray-600">Demo uses fictional clinic and patient details.</p>
           </div>
       </section>
 
